@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="JSMML" default="build.swf" basedir=".">
+    <property file="build.properties" />
+    <property name="build.compiler" value="org.eclipse.jdt.core.JDTCompilerAdapter"/>
+    <property name="dist.dir" value="dist" />
+    <property name="src.dir" value="src" />
+    <property name="height" value="100" />
+    <property name="width" value="200" />
+    <property name="framerate" value="30" />
+    <property name="bgcolor" value="0xFFFFFF" />
+
+    <!-- create swf-->
+    <target name="build.swf" depends="clean">
+        <exec executable="${FLEX3_HOME}/amxmlc.bat" failonerror="true">
+            <arg line="-default-size ${width} ${height}" />
+            <arg line="-default-frame-rate ${framerate}" />
+            <arg line="-default-background-color ${bgcolor}" />
+            <arg line="-output ${dist.dir}/JSMML.swf" />
+            <arg line="${src.dir}/JSMML.as" />
+        </exec>
+    </target>
+
+    <!-- clean dist directory -->
+    <target name="clean">
+        <delete>
+            <fileset dir="${dist.dir}" includes="JSMML.swf" />
+        </delete>
+    </target>
+</project>
