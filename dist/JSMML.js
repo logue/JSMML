@@ -1,212 +1,233 @@
-/*
+/**!
  * JSMML
- * Author: Yuichi Tateno
- * http://rails2u.com/
+ * Copyright (c) 2007      Yuichi Tateno <http://rails2u.com/>,
+ *               2008-2013 Logue <http://logue.be/>
  *
- * Modified by Logue
- * http://logue.be/
- *
- * The MIT Licence.
+ * This software is released under the MIT License.
+ * http://opensource.org/licenses/mit-license.php
  */
 
-JSMML = (function() {
-	return function(swfurl) {
-		this.mmlPlayer = document.getElementById(JSMML.mmlID);
-		this.initialize.call(this);
-	}
-})();
+(function(document, window){
+	JSMML = (function() {
+		return function(swfurl) {
+			this.mmlPlayer = document.getElementById(JSMML.mmlID);
+			this.initialize.call(this);
+		}
+	})();
+	JSMML.VESION = '1.2.6';
+	JSMML.setSWFVersion = function(v) { this.SWF_VERSION = v };
+	JSMML.SWF_VERSION = 'JSMML is not loaded, yet.';
+	JSMML.toString = function() {
+		return 'JSMML VERSION: ' + this.VESION + ', SWF_VERSION: ' + this.SWF_VERSION;
+	};
 
-JSMML.VESION = '1.2.5';
-JSMML.setSWFVersion = function(v) { JSMML.SWF_VERSION = v };
-JSMML.SWF_VERSION = 'JSMML is not loaded, yet.';
-JSMML.toString = function() {
-	return 'JSMML VERSION: ' + JSMML.VESION + ', SWF_VERSION: ' + JSMML.SWF_VERSION;
-};
+	JSMML.swfurl = 'JSMML.swf';
+	JSMML.mmlID = 'jsmml';
+	JSMML.onLoad = function() {};
+	JSMML.loaded = false;
+	JSMML.instances = {};
 
-JSMML.swfurl = 'JSMML.swf';
-JSMML.mmlID = 'jsmml';
-JSMML.onLoad = function() {};
-JSMML.loaded = false;
-JSMML.instances = {};
-
-JSMML.init = function(swfurl) {
-	if (! document.getElementById(JSMML.mmlDivID)) {
-		var div = document.createElement('div');
-		div.id = JSMML.mmlID;
-		try{
-			document.body.appendChild(div);
-		}catch(e){}	// ƒGƒ‰[Á‚µ
-		if (!document.location.protocol.match(/http/i)){
-			document.getElementById(JSMML.mmlID).innerHTML = "JSMML is not running! Please execute this in HTTP protocol.";
-		}else{
+	JSMML.init = function(swfurl) {
+		if (! document.getElementById(this.mmlDivID)) {
 			// init
+			var swfname = (swfurl ? swfurl : this.swfurl) + '?' + (new Date()).getTime();
+			var div = document.createElement('div');
+			div.id = this.mmlDivID;
+			div.style.display = 'inline';
+			div.width = 1;
+			div.height = 1;
+			document.body.appendChild(div);
 
-			if (!swfobject) {
-				var js = document.createElement('script');
-				js.type = 'text/javascript';
-				js.async = true;
-				js.src = url;
-				var s = document.getElementsByTagName('script')[0];
-				s.parentNode.insertBefore('http://ajax.googleapis.com/ajax/libs/swfobject/2.2/swfobject.js', s);
+			if (navigator.plugins && navigator.mimeTypes && navigator.mimeTypes.length) {
+				var o = document.createElement('object');
+				o.id = this.mmlID;
+				o.width = 1;
+				o.height = 1;
+				o.setAttribute('data', swfname);
+				o.setAttribute('type', 'application/x-shockwave-flash');
+				var p = document.createElement('param');
+				p.setAttribute('name', 'allowScriptAccess');
+				p.setAttribute('value', 'always');
+				o.appendChild(p);
+				div.appendChild(o);
+			} else {
+				// IE
+				div.innerHTML =
+					'<object id="' + this.mmlID + '" classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="1" height="1">'+
+					'<param name="movie" value="' + swfname + '" />'+
+					'<param name="bgcolor" value="#FFFFFF" />'+
+					'<param name="quality" value="high" />'+
+					'<param name="allowScriptAccess" value="always" />'+
+					'</object>'
+				;
 			}
-			var swfname = (swfurl ? swfurl : JSMML.swfurl) + '?' + (new Date()).getTime();
-			swfobject.embedSWF(swfname, JSMML.mmlID, "1", "1", "10.0.0","expressInstall.swf", '', 
-				{'bgcolor':'#FFFFFF','quality':'high','allowScriptAccess':'always', 'style':'display:inline;'},
-				{id:JSMML.mmlID}
-			);
 		}
 	}
-}
 
-// call from swf
-JSMML.initASFinish = function() {
-	JSMML.loaded = true;
-	JSMML.onLoad();
-}
-
-JSMML.eventInit = function() {
-	JSMML.init();
-}
-
-JSMML.prototype = {
-	/**
-	 * ‰Šú‰»ƒCƒxƒ“ƒg
-	 */
-	initialize: function() {
-		this.onFinish = function() {};
-		this.pauseNow = false;
-	},
-	/**
-	 * MMLƒvƒŒƒCƒ„[‚Ì”Ô†
-	 * @return number
-	 */
-	uNum: function() {
-		if (!this._uNum) {
-			this._uNum = this.mmlPlayer._create();
-			JSMML.instances[this._uNum] = this;
-		}
-		return this._uNum;
-	},
-	/**
-	 * Ä¶
-	 * @param string _mml MMLƒf[ƒ^[
-	 * @return void
-	 */
-	play: function(_mml) {
-		if (!_mml && this.pauseNow) {
-			this.mmlPlayer._play(this.uNum());
-		} else {
-			if (_mml) this.score = _mml;
-			this.mmlPlayer._play(this.uNum(), this.score);
-		}
-		this.pauseNow = false;
-	},
-	/**
-	 * ’â~
-	 * @return void
-	 */
-	stop: function() {
-		this.mmlPlayer._stop(this.uNum());
-	},
-	/**
-	 * ˆê’â~
-	 * @return void
-	 */
-	pause: function() {
-		this.pauseNow = true;
-		this.mmlPlayer._pause(this.uNum());
-	},
-	/**
-	 * íœiƒƒ‚ƒŠ‰ğ•új
-	 * @return void
-	 */
-	destroy: function() {
-		this.mmlPlayer._destroy(this.uNum());
-		delete JSMML.instances[this.uNum()];
-	},
-	// Add
-	/**
-	 * Ä¶’†‚©H
-	 * @retun boolean
-	 */
-	isPlaying: function(){
-		return this.mmlPlayer._isPlaying(this.uNum());
-	},
-	/**
-	 * ˆê’â~’†‚©H
-	 * @return boolean
-	 */
-	isPaused: function(){
-		return this.mmlPlayer._isPaused(this.uNum());
-	},
-	/**
-	 * ƒ}ƒXƒ^[ƒ{ƒŠƒ…[ƒ€
-	 * @param number volume ƒ{ƒŠƒ…[ƒ€
-	 * @return void
-	 */
-	setMasterVolume: function(volume){
-		return this.mmlPlayer._setMasterVolume(this.uNum(), volume);
-	},
-	/**
-	 * \•¶ƒGƒ‰[‚ğæ“¾
-	 * @return string
-	 */
-	getWarnings: function(){
-		return this.mmlPlayer._getWarnings(this.uNum());
-	},
-	/**
-	 * MML‚Ì‘Sƒ}ƒCƒNƒ•b‚ğæ“¾
-	 * @return number
-	 */
-	getTotalMSec: function(){
-		return this.mmlPlayer._getTotalMSec(this.uNum());
-	},
-	/**
-	 * MML‚Ì‘S‰‰‘tŠÔ‚ğæ“¾
-	 * @return string
-	 */
-	getTotalTimeStr: function(){
-		return this.mmlPlayer._getTotalTimeStr(this.uNum());
-	},
-	/**
-	 * MML‚ÌŒ»İ‚Ìƒ}ƒCƒNƒ•b‚ğæ“¾
-	 * @return number
-	 */
-	getNowMSec: function(){
-		return this.mmlPlayer._getNowMSec(this.uNum());
-	},
-	/**
-	 * MML‚ÌŒ»İ‚ÌŠÔ‚ğæ“¾
-	 * @return string
-	 */
-	getNowTimeStr: function(){
-		return this.mmlPlayer._getNowTimeStr(this.uNum());
-	},
-	/**
-	 * MML‚Ìƒ^ƒCƒgƒ‹‚ğæ“¾
-	 * @return string
-	 */
-	getMetaTitle: function(){
-		return this.mmlPlayer._getMetaTitle(this.uNum());
-	},
-	/**
-	 * MML‚ÌƒA[ƒeƒBƒXƒg–¼‚ğæ“¾
-	 * @return string
-	 */
-	getMetaArtist: function(){
-		return this.mmlPlayer._getMetaArtist(this.uNum());
-	},
-	/**
-	 * MML‚ÌƒR[ƒ_[–¼‚ğæ“¾
-	 * @return string
-	 */
-	getMetaCoding: function(){
-		return this.mmlPlayer._getMetaCoding(this.uNum());
-	},
-	
-	getVoiceCount: function(){
-		return this.mmlPlayer._getVoiceCount(this.uNum());
+	// call from swf
+	JSMML.initASFinish = function() {
+		this.loaded = true;
+		this.onLoad();
 	}
-};
 
-FastInit.addOnLoad(JSMML.eventInit);
+	JSMML.prototype = {
+		/**
+		 * åˆæœŸåŒ–ã‚¤ãƒ™ãƒ³ãƒˆ
+		 */
+		initialize: function() {
+			// MMLã®å†ç”ŸãŒçµ‚äº†ã—ãŸ
+			this.onFinish = function() {};
+			// MMLã®ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ãŒçµ‚äº†ã—ãŸ
+			this.onCompiled = function() {};
+			// ãƒãƒƒãƒ•ã‚¡ãƒªãƒ³ã‚°ä¸­
+			this.onBuffering = function() {};
+			// ä¸€æ™‚åœæ­¢ä¸­
+			this.pauseNow = false;
+		},
+		/**
+		 * MMLãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®ç•ªå·
+		 * @return number
+		 */
+		uNum: function() {
+			if (!this._uNum) {
+				this._uNum = this.mmlPlayer._create();
+				JSMML.instances[this._uNum] = this;
+			}
+			return this._uNum;
+		},
+		/**
+		 * å†ç”Ÿ
+		 * @param string _mml MMLãƒ‡ãƒ¼ã‚¿ãƒ¼
+		 * @return void
+		 */
+		play: function(_mml) {
+			if (!_mml && this.pauseNow) {
+				this.mmlPlayer._play(this.uNum());
+			} else {
+				if (_mml) this.score = _mml;
+				this.mmlPlayer._play(this.uNum(), this.score);
+			}
+			this.pauseNow = false;
+		},
+		/**
+		 * åœæ­¢
+		 * @return void
+		 */
+		stop: function() {
+			this.mmlPlayer._stop(this.uNum());
+		},
+		/**
+		 * ä¸€æ™‚åœæ­¢
+		 * @return void
+		 */
+		pause: function() {
+			this.pauseNow = true;
+			this.mmlPlayer._pause(this.uNum());
+		},
+		/**
+		 * å‰Šé™¤ï¼ˆãƒ¡ãƒ¢ãƒªè§£æ”¾ï¼‰
+		 * @return void
+		 */
+		destroy: function() {
+			this.mmlPlayer._destroy(this.uNum());
+			delete JSMML.instances[this.uNum()];
+		},
+		// Add
+		/**
+		 * å†ç”Ÿä¸­ã‹ï¼Ÿ
+		 * @retun boolean
+		 */
+		isPlaying: function(){
+			return this.mmlPlayer._isPlaying(this.uNum());
+		},
+		/**
+		 * ä¸€æ™‚åœæ­¢ä¸­ã‹ï¼Ÿ
+		 * @return boolean
+		 */
+		isPaused: function(){
+			return this.mmlPlayer._isPaused(this.uNum());
+		},
+		/**
+		 * ãƒã‚¹ã‚¿ãƒ¼ãƒœãƒªãƒ¥ãƒ¼ãƒ 
+		 * @param number volume ãƒœãƒªãƒ¥ãƒ¼ãƒ ï¼ˆ0~127ï¼‰
+		 * @return void
+		 */
+		setMasterVolume: function(volume){
+			return this.mmlPlayer._setMasterVolume(this.uNum(), volume);
+		},
+		/**
+		 * æ§‹æ–‡ã‚¨ãƒ©ãƒ¼ã‚’å–å¾—
+		 * @return string
+		 */
+		getWarnings: function(){
+			return this.mmlPlayer._getWarnings(this.uNum());
+		},
+		/**
+		 * MMLã®å…¨ãƒã‚¤ã‚¯ãƒ­ç§’ã‚’å–å¾—
+		 * @return number
+		 */
+		getTotalMSec: function(){
+			return this.mmlPlayer._getTotalMSec(this.uNum());
+		},
+		/**
+		 * MMLã®å…¨æ¼”å¥æ™‚é–“ã‚’å–å¾—
+		 * @return string
+		 */
+		getTotalTimeStr: function(){
+			return this.mmlPlayer._getTotalTimeStr(this.uNum());
+		},
+		/**
+		 * MMLã®ç¾åœ¨ã®ãƒã‚¤ã‚¯ãƒ­ç§’ã‚’å–å¾—
+		 * @return number
+		 */
+		getNowMSec: function(){
+			return this.mmlPlayer._getNowMSec(this.uNum());
+		},
+		/**
+		 * MMLã®ç¾åœ¨ã®æ™‚é–“ã‚’å–å¾—
+		 * @return string
+		 */
+		getNowTimeStr: function(){
+			return this.mmlPlayer._getNowTimeStr(this.uNum());
+		},
+		/**
+		 * MMLã®ã‚¿ã‚¤ãƒˆãƒ«ã‚’å–å¾—
+		 * @return string
+		 */
+		getMetaTitle: function(){
+			return this.mmlPlayer._getMetaTitle(this.uNum());
+		},
+		/**
+		 * MMLã®ã‚¢ãƒ¼ãƒ†ã‚£ã‚¹ãƒˆåã‚’å–å¾—
+		 * @return string
+		 */
+		getMetaArtist: function(){
+			return this.mmlPlayer._getMetaArtist(this.uNum());
+		},
+		/**
+		 * MMLã®ã‚³ãƒ¡ãƒ³ãƒˆã‚’å–å¾—
+		 * @return string
+		 */
+		getMetaComment: function(){
+			return this.mmlPlayer._getMetaComment(this.uNum());
+		},
+		/**
+		 * MMLã®ã‚³ãƒ¼ãƒ€ãƒ¼åã‚’å–å¾—
+		 * @return string
+		 */
+		getMetaCoding: function(){
+			return this.mmlPlayer._getMetaCoding(this.uNum());
+		},
+		/**
+		 * getVoiceCount
+		 * @return number
+		 */
+		getVoiceCount: function(){
+			return this.mmlPlayer._getVoiceCount(this.uNum());
+		}
+	};
+
+	window.addEventListener('DOMContentLoaded', function() {
+		JSMML.init();
+	});
+})(document, window);

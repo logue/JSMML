@@ -1,18 +1,12 @@
-/*
- * Author: Yuichi Tateno
- * http://rails2u.com/
+/**
+ * JSMML
+ * Copyright (c) 2007      Yuichi Tateno <http://rails2u.com/>,
+ *               2008      inudaisho <http://inudaisho.sakura.ne.jp/>
+ *               2009-2013 Logue <http://logue.be/>
  *
- * The MIT Licence.
+ * This software is released under the MIT License.
+ * http://opensource.org/licenses/mit-license.php
  */
-
-/*
-* modified by inudaisho
-* http://inudaisho.sakura.ne.jp/
-*
-* modified by Logue 2013/10/11
-* http://logue.be/
-*/
-
 package {
 	import flash.display.Sprite;
 	import flash.utils.Timer;
@@ -23,11 +17,11 @@ package {
 	
 	import com.txt_nifty.sketch.flmml.MMLEvent;
 
-	[SWF(frameRate="384")]
+	[SWF(frameRate="30")]
 	public class JSMML extends Sprite {
-		public static const VERSION:String = '1.2.6.#19253';
-		
-		private var debug:Boolean = false;
+		public static const VERSION:String = '1.2.6#19253';
+
+//		private var debug:Boolean = false;
 
 		public var mmlPlayers:Object = {};
 		
@@ -61,12 +55,12 @@ package {
 			player(uNum).addEventListener(Event.COMPLETE,				onComplete(uNum));
 			// Add
 			player(uNum).addEventListener(MMLEvent.COMPILE_COMPLETE,	onCompileComplete(uNum));
-			player(uNum).addEventListener(MMLEvent.BUFFERING,			onBuffering(uNum));
+			player(uNum).addEventListener(MMLEvent.BUFFERING,			onBuffering(uNum));	// TODO
 			
 //			m_timer[uNum] = new Timer(250*4, 0);
 //			m_timer[uNum].addEventListener(TimerEvent.TIMER, onSecond);
 
-//			ExternalInterface.call('console.info("JSMML.swf : Create Player : ' + uNum + '")');
+//			if (debug) ExternalInterface.call('console.info("JSMML.swf : Create Player : ' + uNum + '")');
 			return uNum;
 		}
 
@@ -87,21 +81,21 @@ package {
 		public function onComplete(uNum:Number):Function {
 			return function(e:*):void {
 				ExternalInterface.call('JSMML.instances["' + uNum + '"].onFinish()');
-				if (this.debug) ExternalInterface.call('console.info("JSMML.swf : MML is finished: ' + uNum + '")');
+//				if (debug) ExternalInterface.call('console.info("JSMML.swf : MML is finished: ' + uNum + '")');
 			};
 		}
 
 		public function onCompileComplete(uNum:Number):Function {
 			return function(e:*):void {
-				ExternalInterface.call('JSMML.instances["' + uNum + '"].onCompileComplete()');
-				if (this.debug) ExternalInterface.call('console.info("JSMML.swf : Compile Complete.: ' + uNum + '")');
+				ExternalInterface.call('JSMML.instances["' + uNum + '"].onCompiled()');
+//				if (debug) ExternalInterface.call('console.info("JSMML.swf : Compile Complete.: ' + uNum + '")');
 			};
 		}
 
 		public function onBuffering(uNum:Number):Function {
 			return function(e:*):void {
 				ExternalInterface.call('JSMML.instances["' + uNum + '"].onBuffering()');
-				if (this.debug) ExternalInterface.call('console.info("JSMML.swf : Buffering...: ' + uNum + '")');
+//				if (debug) ExternalInterface.call('console.info("JSMML.swf : Buffering...: ' + uNum + '")');
 			};
 		}
 
@@ -111,6 +105,7 @@ package {
 
 		public function play(uNum:Number, mml:String = undefined):void {
 			player(uNum).play(mml);
+//			if (debug) ExternalInterface.call('console.log("JSMML.swf : Play: ' + uNum + '")');
 		}
 /*
 		public function setMML(uNum:Number, mml:String):void {
@@ -120,24 +115,24 @@ package {
 
 		public function stop(uNum:Number):void {
 			player(uNum).stop();
-			if (this.debug) ExternalInterface.call('console.log("JSMML.swf : Stop: ' + uNum + '")');
+//			if (debug) ExternalInterface.call('console.log("JSMML.swf : Stop: ' + uNum + '")');
 		}
 
 		public function pause(uNum:Number):void {
 			player(uNum).pause();
-			if (this.debug) ExternalInterface.call('console.log("JSMML.swf : Pause: ' + uNum + '")');
+//			if (debug) ExternalInterface.call('console.log("JSMML.swf : Pause: ' + uNum + '")');
 		}
 
 		public function destroy(uNum:Number):void {
 			stop(uNum);
-			if (this.debug) ExternalInterface.call('console.log("JSMML.swf : Destory: ' + uNum + '")');
+//			if (debug) ExternalInterface.call('console.log("JSMML.swf : Destory: ' + uNum + '")');
 			delete mmlPlayers[uNum];
 		}
 
 		public function player(uNum:Number):MMLPlayer {
 			if (!mmlPlayers[uNum]){
 				new Error("Player is not found: " + uNum);
-				if (this.debug) ExternalInterface.call('console.error("JSMML.swf : Player is not found: ' + uNum + '")');
+//				if (debug) ExternalInterface.call('console.error("JSMML.swf : Player is not found: ' + uNum + '")');
 			}
 			return mmlPlayers[uNum];
 		}
@@ -145,12 +140,12 @@ package {
 /* Add */
 		public function isPlaying(uNum:Number):Boolean {
 			return player(uNum).isPlaying();
-			if (this.debug)  ExternalInterface.call('console.info("JSMML.swf : Player is Playing: ' + uNum + '")');
+//			if (debug)  ExternalInterface.call('console.info("JSMML.swf : Player is Playing: ' + uNum + '")');
 		}
 
 		public function isPaused(uNum:Number):Boolean {
 			return player(uNum).isPaused();
-			if (this.debug) ExternalInterface.call('console.info("JSMML.swf : Player is Pasueing: ' + uNum + '")');
+//			if (debug) ExternalInterface.call('console.info("JSMML.swf : Player is Pasueing: ' + uNum + '")');
 		}
 
 		public function setMasterVolume(uNum:Number,vol:int):void {
@@ -159,7 +154,7 @@ package {
 
 		public function getWarnings(uNum:Number):String {
 			return player(uNum).getWarnings();
-			if (this.debug) ExternalInterface.call('console.info("JSMML.swf :' + player(uNum).getWarnings() + '")');
+//			if (debug) ExternalInterface.call('console.info("JSMML.swf :' + player(uNum).getWarnings() + '")');
 		}
 
 		public function getTotalMSec(uNum:Number):uint {
