@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja">
+<html>
+	<head>
+		<meta charset="UTF-8" />
+		<title>JSMML Sample</title>
+		<link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet" />
+		<link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-theme.min.css" rel="stylesheet" />
+	</head>
+	<body>
+		
+		<div class="container">
+			<div class="header">
+				<ul class="nav nav-pills pull-right">
+					<li class="active"><a href="index.html">Basic Sample</a></li>
+					<!--li><a href="inst.html">Simple Test</a></li>
+					<li><a href="fm.html">FM Instrument Test</a></li-->
+					<li><a href="https://github.com/logue/JSMML">GitHub</a></li>
+					<li><a href="https://github.com/logue/JSMML/archive/master.zip">Download</a></li>
+				</ul>
+				<h3 class="text-muted">JSMML Sample</h3>
+			</div>
+			<hr class="clearfix" />
+			<div class="panel panel-primary">
+				<div class="panel-heading">Textarea Player</div>
+				<div class="panel-body">
+					<div class="row">
+						<div class="col-sm-2">
+							<button class="btn btn-primary" value="play" id="play" disabled="disabled" title="Play / Pause"><span class="glyphicon glyphicon-play"></span></button>
+							<button class="btn btn-danger" value="stop" id="stop" disabled="disabled" title="Stop"><span class="glyphicon glyphicon-stop"></span></button>
+						</div>
+						<div class="col-sm-4">
+							<div class="form-group">
+								<div class="input-group">
+									<span class="input-group-addon"><span class="glyphicon glyphicon-volume-down"></span></span>
+									<input id="volume" type="range" class="form-control input-sm" min="0" max="127" step="1" value="127" title="Master Volume" />
+									<span class="input-group-addon"><span class="glyphicon glyphicon-volume-up"></span></span>
+								</div>
+							</div>
+						</div>
+						<div class="col-sm-4">
+							<div class="progress progress-striped" id="progress" title="Music Progress">
+								<div class="progress-bar" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width: 100%;">
+								</div>
+							</div>
+						</div>
+						<div class="col-sm-2">
+							<span id="cast" title="Cast time">00:00 / 00:00</span>
+						</div>
+					</div>
+					<textarea id="ta" rows=8 cols=50 class="form-control">
+#TITLE ルパン三世'79
+#ARTIST 大野雄二
+#COMMENT マビノギ用のMMLを変換
+#CODING Logue
+/** Setup **/
+$track1 = @             @E1,8,24,64,16 @F1,24,80,48 @L16,36,0,128,0,0 @P32 v8l4o5;
+$track2 = @2            @E1,8,48,80,24 @F1,36,80,18 @L16,36,0,128,0,0 @P96 v8l4o5;
+$track3 = @3 @W24 @E1,0,48,36,12 @F1,32,64,64 @P64 v8l4o5;
+/** 1 **/
+$track1 v13l64&gt;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;a&amp;av0a2a8v15l12ar24bb24rb6a+a+24ab24&lt;c+d24r2.r&gt;a24r4aa24bb24rb6a+a+24ab24&lt;cd24r1l8rdr12fg2r6gr12fa2r24l8.ffffl8fffr4c2&amp;cr1.r1.r1d6l12dr4d6dr4d6dr4d6dr4e4e4r8e8.&amp;e48e6d8dd24dd24re6ee24c+c+24c+d24r4.c2&amp;c8r1.r1.r8&gt;f24rg8.&amp;g48f24r2&lt;d6dr4d6dr4d6dr4d6dr4e4e4r8e8.&amp;e48e6d6dr8d2&amp;d8r8d2dr24d&gt;a+24ra24ra24g+a24a+a24a+&lt;c4r24&gt;a+16a16ra+4a+4r6a+24rb+8a+a+6b+l24ar3ag+12ab+12a+r12a6grgr12&lt;gr8.r48&gt;gf+12ga+12ad+12eg8frfr12&lt;fr4&gt;dl12rfa24r&lt;d4.&amp;d24f24re8d24rc+d24re1r6&gt;a24rg8fg24e24r1.r1.r1r3rr24&lt;d6dr4d6dr4d6dr4d6dr4e4e4r8e8.&amp;e48e6r1r8b24r8a24rb&amp;br1r4.r24a24ra24raa24r8a2l8.fffff8f8f8r4a2&amp;a8;
+$track1 v13r1r8l12&gt;fr24a8ra6g+g+24g+r24g+f24r1r8ff24aa24rg+6gg24gr24gf24r1l8rar12&lt;dd2r6dr12de2r24l8.cc&gt;bbl8bb&lt;cr4&gt;g2&amp;gr1.r1.r1a6l12br4g+6ar4g+6ar4g+6g+r4b4b4r8a8.&amp;a48a6r8aa24aa24rb6a+a+24gg24ga24r4.a2&amp;a8r1.r1.r1a6br4g+6ar4g+6ar4g+6g+r4b4b4r8a8.&amp;a48a6g+6gr8f2&amp;f8r8g2gr24gg24rf24c&gt;a24g+a24a+a24a+&lt;c4r4d4d4r6d24re8dd6el24cr1.r1r6rf4.&amp;ffr12e8er12e12er12e1r6er12d8c+12d&gt;a;
+$track1 v15l1.rrrr2r8&gt;f8r12a8b2r6b8r12a+8&lt;c+2rrrrrrr1r4.r24&gt;e2&amp;e8rrrrrrrrrr1r4.r12a4&amp;a24b+4a2rrrr2a6l12br4g+6ar4g+6ar4g+6g+r4b4b4r8a8.&amp;a48a6r1r8l24&lt;gr8fr12g6r1r4.rfr12fr12f12fr8f2l8.cc&gt;bbb8b8&lt;c8r4c2&amp;c8;
+/** 2 **/
+$track2 v13l64&lt;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;dv0d2d8v15l12dr24fd24rg+6gf24g8fd24r2.ra24r4af24ga24rg+6gf24gf24cd24r1l8rdr12fg2r6gr12fa2r24l8.&lt;dc&gt;ag+l8gfdr4c2&amp;cl1.rrr1r6r24g6rr1r4l12ge24fa24rg+6gf24g8cd24r4.c2&amp;c8r1r&gt;d24fg24a&lt;d24r&gt;g+8g24fa6r4.r&lt;d24r8c-4c4r8d24rd6&amp;d24dr2r6g6r1.r1r8g+6gr8f4g8a8f8r8&lt;d2&gt;a+24rge24r&lt;c2&amp;cr&gt;a24ra+&lt;c24rd4d4r6g24re8dd6el24cr1r12&gt;gr2.r6rfr1.r4e12dr12ed12re12dr12ed12r&gt;a12&lt;a2&amp;ar2r8&gt;ar12gfed12cd12r2df12ga12&lt;dr12&gt;g+8gf12g6r4&lt;dr12&gt;gg+gf48d16cdr2r6aa6&amp;aar8&lt;d12rd12ar12g2&amp;g6d6e6f4d3r6rd12ar12g2r6e6rcc8d2r4l16arg1r8arf2r8&lt;cr&gt;b1r8l8.&lt;dc&gt;ag+g8f8d8r4g2&amp;g8;
+$track2 v13r1r8l12dr24fd24rg+6gf24g8fd24r2.ra24r4af24ga24rg+6gf24gf24cd24r1l8rar12&lt;cd2r6dr12de2r24l8.dc&gt;bbl8&lt;c+&gt;aar4g2&amp;gl1.rrr1r6r24&lt;d6rrr1&gt;a2&amp;a8rr2.l12ra24r8g+4g4r8a24ra6&amp;a24ar2r6&lt;d6r1.r1r8e6d+r8d4&gt;a8b+8a8r8&lt;d2&gt;a+24rae24r&lt;c2&amp;cr&gt;a24ra+&lt;c24rd4d4r6&gt;a+24rb+8a+a+6b+l24gr1r12&lt;dr2.r6rdr1.r4&gt;e12dr12ed12re12dr12ed12r&gt;a12o6e2&amp;er1.r1.r2r6r&gt;ff6&amp;ffr1.r1.r4.l16ara2r4arg1r8ara2r8&lt;drd1r8l8.dc&gt;bb&lt;c+8&gt;a8a8r4&lt;d+2&amp;d+8;
+$track2 v13l1.rrrr2l8rdr12fg2r6gr12fa2r24l8.aaag+l8gfdr4d2&amp;dl1.rrr1r6r24g6rrr1e2&amp;e8rrr1r8.r48g6rrr2.g2r1e24l12rf+f+24rg4g4r6g24re8dd6ed24l1.rrrr8.r48a2&amp;a24rrrrrrr2l16&lt;drd2r8arg1r8l8.&gt;aaag+g8f8d8r4&lt;c2&amp;c8;
+/** 3 **/
+$track3 v15l64o3d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;d&amp;dt120v0d2v15d8r8l12a+a+24re6ee24aa24l8a&lt;ddcc&gt;a+12a+24a+aedrl12a+a+24re6ee24aa24l8a&lt;ddcc&gt;a+12a+24a+a&gt;ar&lt;dr12fg2r6gr12&gt;a+a2r24l8.&lt;dfcel8&gt;a+a&lt;dr4&gt;a2&amp;a&lt;dcc-deg+a&lt;c+ddffe&gt;a+a12e24&lt;c+d12d24c&gt;bfeg+ad+ddd+d+d12&lt;d24&gt;dag+ggbgg+12g+24g+gaa+a+bba+12f24dfde&lt;e&gt;a+ga12e24c+eal12&lt;dd24cc24&gt;bb24r&lt;e6ee24&gt;a+8a&lt;d24r4.&gt;a2&amp;a8l8dcc-deg+a&lt;c+ddffe&gt;a+a12e24&lt;c+d12d24c&gt;bfeg+ad+ddd+d+d12&lt;d24&gt;dag+ggbgg+12g+24g+gaa+a+bba+12f24dfde&lt;e&gt;a+ga12e24c+dae.&amp;e48d+24rd2&amp;dg12r24g4.cdegffgga12a24a&lt;cfg12d24&gt;g&lt;d12&gt;g24&lt;c+c12&gt;a+24egf+ffa&lt;ef12f24ec&gt;feegg+a&lt;aed+d&gt;a&lt;dc+c&gt;f&lt;c12c24r12&gt;a+6bfdeg+gg+aaa+a+a4.l12a+a2&amp;a24&lt;ar24ab24b+a8b+24l8&gt;dcc-deg+a&lt;c+d12d24dffeg+ad+d12d24c&gt;bfe12e24g+ad+ddd+d+d12f24&lt;d&gt;ag+ggbgg+12g+24g+gg+a+a+bba+12f24dfde&lt;e&gt;a+ga12a24ec+edefa&lt;d12&gt;a24ffg1&amp;gddada12a24afg4o5d&gt;bgd12&gt;b24gdc-l8.dfc-e&gt;a+8a8&lt;d8r4&gt;a2&amp;a8;
+$track3 v15r1.r2l24rrdf12der12g8f12fd12fe8&gt;a8r1o6d8c8&gt;aa+bl12b+a6fd24gc+6l8rdr12fg2r6gr12fa2&lt;c24l8.dc&gt;ag+l8gfdr4c+4&gt;ab+12a6&lt;d2rd24e6c6&gt;a2l24g+gfg16f16a12ab+12a&lt;d12ec12d4.de8c12d8&gt;a2r8&lt;c+d8d12a8g2&amp;g6d6e6ef6ed+d2d8a8gag4.r6e6c6cd1r2r12&gt;g+a8b+12a8&lt;d2&amp;d8de6c8.&amp;c48&gt;a2g+gfg12fa12ab+12a&lt;d12ec12d4.de6c-c6&gt;a2&amp;a8&lt;d8d12g+a12g2&amp;g6d6re8ef6ed+d4.d8da6rgag2re6c6cd8.&amp;d48d6d2&amp;d8l1.rrrrrrd2&amp;d12d24e6c6r24&gt;a2;
+$track3 v15l1.rrrrrrrrrrrrrrrrrrrrrrrrr2l6&gt;ab+al24&lt;cddd4.&amp;d48r16de8c12d8&gt;a2&amp;a6&lt;cd12d12a8g2&amp;g6d6e6f6&amp;fed+d2d12ar12g2&amp;g6e8.&amp;e48c6d2r8&lt;d8&gt;a8g4.b4gagg8.&amp;g48e2.&gt;defgab&lt;cdff+g12aa8a12ar8a2l8.&lt;dc&gt;ag+g8f8d8r4e2&amp;e8;
+</textarea>
+				</div>
+			</div>
+			<div class="panel panel-info">
+				<div class="panel-heading">Info</div>
+				<div class="panel-body row">
+					<dl class="dl-horizontal col-md-6">
+						<dt>Title</dt>
+						<dd id="mml-title"></dd>
+						<dt>Artist</dt>
+						<dd id="mml-artist"></dd>
+						<dt>Comment</dt>
+						<dd id="mml-comment"></dd>
+						<dt>Coding</dt>
+						<dd id="mml-coding"></dd>
+					</dl>
+					<div class="col-md-6 alert" id="mml-warning">
+					</div>
+				</div>
+			</div>
+		</div>
+		<script type="text/javascript" src="//codeorigin.jquery.com/jquery-1.10.2.min.js"></script>
+		<script type="text/javascript" src="//netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+		<script type="text/javascript" src="./JSMML.js"></script>
+		<script type="text/javascript" defer="defer">/*<![CDATA[*/
+var mml;
+var loaded = false;
+JSMML.swfurl = './JSMML.swf';
+
+$(document).ready(function(){
+	$('#progress').addClass('active');
+	// JSMMLのonLoad時に処理を実装すること
+	JSMML.onLoad = function() {
+		mml = new JSMML();
+		$('.btn, input, textarea').removeAttr('disabled');
+		console.info(JSMML);
+
+		// 再生／一時停止ボタン
+		$('#play').click(function(){
+			if (loaded){
+				if (mml.isPlaying()) {	// 停止中
+					// 停止
+					mml.pause();
+				}else{			// 再生中
+					// 再生
+					mml.play();
+				}
+			}else{
+				$('#progress').removeClass('progress-striped').removeClass('active');
+				mml.play($('#ta').val());
+				loaded = true;
+			}
+		});
+		// 停止ボタン
+		$('#stop').click(function(){
+			mml.stop();
+			$('#progress').children('.progress-bar').css('width','0%');
+			loaded = false;
+		});
+		
+		// マスターボリューム
+		$('#volume').change(function(){
+			var value = $(this).val();
+			mml.setMasterVolume(value);
+		});
+		
+		var isFinish = false;
+		// MMLの再生が終了したとき再生終了フラグを立てる
+		mml.onFinish = function() {
+			isFinish = true;
+		}
+
+		$('#mml-warning').removeClass('alert-warning');
+
+		// MMLのコンパイルが終了した
+		mml.onCompiled = function(){
+			$('#mml-warning').text('');
+			// メタ情報を取得
+			$('#mml-title').text(mml.getMetaTitle());
+			$('#mml-artist').text(mml.getMetaArtist());
+			$('#mml-comment').text(mml.getMetaComment());
+			$('#mml-coding').text(mml.getMetaCoding());
+			// MMLの警報を取得
+			var warning = mml.getWarnings();
+			if (warning !== '') {
+				$('#mml-warning').text(warning).addClass('alert-warning');
+			}
+			$('#progress').removeClass('active');
+		}
+		// MMLをバッファリングしている
+		// TODO:進捗率
+		mml.onBuffering = function(){
+			$('#progress').removeClass('progress-striped');
+	//		$('#mml-warning').text('Now Buffering...');
+		}
+		// プログレスバーとタイム
+		setInterval(function(){
+			// MMLが再生中かをチェック
+			if (mml.isPlaying()) {
+				// 時間進行
+				$('#cast').text(mml.getNowTimeStr()+' / '+mml.getTotalTimeStr());
+				// 進捗率
+				$('#progress').children('.progress-bar').css('width',(mml.getNowMSec()/mml.getTotalMSec()*100)+'%');
+				// ボタンの表示はこっちでコントロールする
+				$('#play').
+					html('<span class="glyphicon glyphicon-pause"></span>').
+					removeClass('btn-primary').
+					addClass('btn-success');
+			}else{
+				$('#play').
+					html('<span class="glyphicon glyphicon-play"></span>').
+					removeClass('btn-success').
+					addClass('btn-primary');
+				
+			}
+		},200);
+	}
+	$('*[title]').tooltip();
+});
+
+// ページから出るときにメモリ解放
+$(window).unload(function(){
+	mml.destroy();
+});
+
+$.getScript(('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js',function(){
+	try {
+		var pageTracker = _gat._getTracker("UA-33600926-1");
+		pageTracker._trackPageview();
+	} catch(err) {}
+});
+/*]]>*/</script>
+	</body>
+</html>
