@@ -15,7 +15,7 @@ package {
 	import flash.system.Security;
 	import flash.events.Event;
 	
-	import com.txt_nifty.sketch.flmml.MMLEvent;
+	import com.flmml.MMLEvent;
 
 	[SWF(frameRate="30")]
 	public class JSMML extends Sprite {
@@ -189,8 +189,8 @@ package {
 	}
 }
 
-import com.txt_nifty.sketch.flmml.MML;
-import com.txt_nifty.sketch.flmml.MOscillator;
+import com.flmml.MML;
+import com.flmml.MOscillator;
 import flash.events.Event;
 
 internal class MMLPlayer extends MML {

@@ -1,0 +1,20 @@
+﻿/*
+   ＧＢノイズ 再生サンプル
+*/
+
+t120
+@@6 @n0,6
+@ea&, n,1,15, n,10,13, r,8,0
+l4 q11,16
+o4
+ @n0 cr @n10 cr @n40 cr @n70 cr
+ @n3 cr @n13 cr @n43 cr @n73 cr
+ @n7 cr @n17 cr @n47 cr @n77 cr
+rr
+
+/* ショートモード */
+@@6-1
+ @n0 cr @n10 cr @n40 cr @n70 cr
+ @n2 cr @n12 cr @n42 cr @n72 cr
+ @n7 cr @n17 cr @n47 cr @n77 cr
+;

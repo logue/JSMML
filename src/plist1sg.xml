@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<playlist>
+	<item url="plist0.xml">（親の階層へ戻る）</item>
+	<item url="smp000.txt">音源：@@0 サイン波</item>
+	<item url="smp001.txt">音源：@@1 ノコギリ波</item>
+	<item url="smp002.txt">音源：@@2 三角波</item>
+	<item url="smp003.txt">音源：@@3 パルス波</item>
+	<item url="smp004.txt">音源：@@4 ホワイトノイズ</item>
+	<item url="smp005.txt">音源：@@5 ＦＣノイズ</item>
+	<item url="smp006.txt">音源：@@6 ＧＢノイズ</item>
+	<item url="smp007.txt">音源：@@7 ＰＳＧノイズ</item>
+	<item url="smp008.txt">音源：@@8 波形メモリ</item>
+	<item url="smp009.txt">音源：@@9 ＦＭ音源</item>
+	<item url="smp010.txt">音源：@@10 FC-DPCM</item>
+	<item url="smp011.txt">音源：@@11 Unsigned 8bit PCM</item>
+	<item url="smp020.txt">ノートオン時の位相リセットと非リセット</item>
+</playlist>

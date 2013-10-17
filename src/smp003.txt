@@ -1,0 +1,20 @@
+﻿/*
+   パルス波 再生サンプル
+*/
+
+t120
+@@3
+@ea&, n,1,15, n,10,13, r,8,0
+l4 q11,16
+o4
+@w4,8
+cdefgab>c<
+@w3
+cdefgab>c<
+@w2
+cdefgab>c<
+@w1
+cdefgab>c<
+@w1,16
+cdefgab>c<
+;

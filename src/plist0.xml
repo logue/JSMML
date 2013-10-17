@@ -1,0 +1,6 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<playlist>
+	<item url="plist1sg.xml">音源モジュール関係</item>
+	<item url="plist1env.xml">エンベロープ関係</item>
+	<item url="plist1lfo.xml">ＬＦＯ関係</item>
+</playlist>

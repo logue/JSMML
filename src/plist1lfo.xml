@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<playlist>
+	<item url="plist0.xml">（親の階層へ戻る）</item>
+	<item url="smp200.txt">ＬＦＯ：音程ＬＦＯ</item>
+	<item url="smp210.txt">ＬＦＯ：音量ＬＦＯ</item>
+	<item url="smp220.txt">ＬＦＯ：フィルタＬＦＯ</item>
+	<item url="smp230.txt">ＬＦＯ：パンポットＬＦＯ</item>
+	<item url="smp240.txt">ＬＦＯ：音程と音量のＬＦＯ同時有効</item>
+</playlist>

@@ -1,0 +1,309 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
+				xmlns:flmml="com.flmml.*"
+				minWidth="600" minHeight="400" creationComplete="init();" horizontalAlign="center"
+				layout="absolute" verticalAlign="top">
+
+	<mx:Style>
+		@namespace mx "http://www.adobe.com/2006/mxml";
+		global
+		{
+			font-size: 14;
+		}
+		mx|TextArea,mx|TextInput,mx|DataGrid {
+			font-family: "MS Gothic","Osaka-Mono";
+		}
+	</mx:Style>
+
+	<mx:Script>
+	<![CDATA[
+		import flash.events.Event;
+		import flash.events.IOErrorEvent;
+		import flash.net.URLLoader;
+		import flash.net.URLRequest;
+		import mx.collections.ArrayCollection;
+		import mx.events.ListEvent;
+		import mx.managers.CursorManager;
+
+		import com.flmml.MMLEvent;
+
+		protected var m_timer:Timer;
+
+		protected var m_xml:XML;
+		XML.ignoreComments = false;
+		XML.ignoreWhitespace = true;
+
+		protected var m_plMode:Boolean = false;
+		protected var m_selFile:String;
+		protected var m_urlList:Array = new Array();
+		protected var m_loader:URLLoader;
+		protected var m_request:URLRequest;
+
+		[Bindable]
+		public var m_playlist:ArrayCollection = new ArrayCollection();
+
+		public function init():void {
+			if (this.parameters["mml"] != undefined) input.text = unescape(this.parameters["mml"]);
+
+			player.addEventListener(MMLEvent.COMPILE_COMPLETE, setWarnings);
+			player.addEventListener(MMLEvent.COMPLETE,         onComplete);
+			player.addEventListener(MMLEvent.BUFFERING,        onBuffering);
+			m_timer = new Timer(250*4, 0);
+			m_timer.addEventListener(TimerEvent.TIMER, onSecond);
+
+			setPlaylist("plist0.xml");
+		}
+
+		public function setPlaylist(filename:String):void {
+			var errf:Boolean = false;
+			CursorManager.setBusyCursor();
+			m_loader = new URLLoader();
+			m_request = new URLRequest(filename);
+			try {
+				m_loader.load(m_request);
+			}
+			catch (error:SecurityError) {
+				errf = true;
+			}
+			if (errf == true) {
+				CursorManager.removeBusyCursor();
+				m_playlist.addItem( { Title:"プレイリストの読み込みでセキュリティエラーが発生しました。" } );
+				m_plMode = false;
+				m_loader = null;
+				m_request = null;
+			}
+			else {
+				m_loader.addEventListener(Event.COMPLETE,setPlaylistArray);
+				m_loader.addEventListener(IOErrorEvent.IO_ERROR,setERRplaylist);
+			}
+		}
+		private function setPlaylistArray(event:Event):void {
+			var loader:URLLoader;
+			var pl:XML;
+			var i:int;
+			var len:int;
+			loader = event.target as URLLoader; 
+			if (loader != null) {
+				m_xml = new XML(loader.data);
+				if (m_playlist.length > 0) {
+					m_playlist.removeAll();
+				}
+				len = m_urlList.length;
+				if (len > 0) {
+					for (i = 0; i < len; i++) m_urlList.pop();
+				}
+				for each (pl in m_xml.item) {
+					m_playlist.addItem( { Title:pl } );
+					m_urlList.push(pl.@url);
+				}
+				m_plMode = true;
+				m_selFile = m_urlList[0];
+				m_loader = null;
+				m_request = null;
+				CursorManager.removeBusyCursor();
+			}
+		}
+		private function setERRplaylist(event:IOErrorEvent):void {
+			m_playlist.addItem( { Title:"プレイリスト（*.xml）の読み込みに失敗しました。" } );
+			m_plMode = false;
+			CursorManager.removeBusyCursor();
+			m_loader = null;
+			m_request = null;
+		}
+
+		public function setPlayItem(event:ListEvent):void {
+			if (m_plMode == true) {
+				m_selFile = m_urlList[event.rowIndex];
+				//trace(m_selFile);
+				//trace(event.type);
+			}
+		}
+
+		public function openPlayItem(event:ListEvent):void {
+			var ext:String;
+			if (m_plMode == true) {
+				m_selFile = m_urlList[event.rowIndex];
+				ext = m_selFile.substr((m_selFile.length) - 4, 4);
+				ext = ext.toLowerCase();
+				if (ext == ".txt") {
+					stop();
+					setMML(m_selFile);
+				}
+				else if (ext == ".xml") {
+					setPlaylist(m_selFile);
+				}
+				else {
+					warnings.text = "（*.txt）または（*.xml）以外のファイルは対象外です。";
+				}
+			}
+		}
+
+		public function setMML(filename:String):void {
+			var errf:Boolean = false;
+			CursorManager.setBusyCursor();
+			m_loader = new URLLoader();
+			m_request = new URLRequest(filename);
+			try {
+				m_loader.load(m_request);
+			}
+			catch (error:SecurityError) {
+				errf = true;
+			}
+			if (errf == true) {
+				CursorManager.removeBusyCursor();
+				warnings.text = "ＭＭＬの読み込みでセキュリティエラーが発生しました。";
+				m_loader = null;
+				m_request = null;
+			}
+			else {
+				m_loader.addEventListener(Event.COMPLETE,setMMLtext);
+				m_loader.addEventListener(IOErrorEvent.IO_ERROR,setERRmmltext);
+			}
+		}
+		private function setMMLtext(event:Event):void {
+			var loader:URLLoader;
+			loader = event.target as URLLoader; 
+			if (loader != null) {
+				input.text = "";
+				input.text = String(loader.data).replace(/\r\n|\r/g, '\n');
+				warnings.text = "";
+				warnings2.text = "";
+				m_loader = null;
+				m_request = null;
+				CursorManager.removeBusyCursor();
+				if (player.isPlaying()==true) {
+					stop();
+					play();
+				}
+				else {
+					play();
+				}
+			}
+		}
+		private function setERRmmltext(event:IOErrorEvent):void {
+			warnings.text = "ＭＭＬ（*.txt）の読み込みに失敗しました。";
+			CursorManager.removeBusyCursor();
+			m_loader = null;
+			m_request = null;
+		}
+
+		public function setWarnings(e:Event):void {
+			warnings.text = player.getWarnings();
+			warnings2.text = warnings.text;
+		}
+
+		public function play():void {
+			if (!player.isPlaying()) {
+				if (player.isPaused()) m_timer.start();
+				if (player.play(input.text) == true) {
+					playButton.label = "Pause";
+					currentTitle.text = player.getMetaTitle();
+					currentComment.text = player.getMetaComment();
+					player.setMasterVolume(hSlider.value);
+				}
+				else {
+					stop();
+				}
+			}
+			else {
+				player.pause();
+				playButton.label = "Play";
+				m_timer.stop();
+			}
+		}
+
+		public function stop():void {
+			player.stop();
+			playButton.label = "Play";
+			m_timer.reset();
+			progress.text = "";
+			voiceCount.text = "";
+		}
+
+		public function onComplete(e:Event):void {
+			playButton.label = "Play";
+			m_timer.reset();
+			progress.text = "";
+			voiceCount.text = "";
+		}
+
+		public function onBuffering(e:MMLEvent):void {
+			if (e.progress < 100) {
+				progress.text = "Buffering " + e.progress + "%";
+				voiceCount.text = "";
+			}
+			else {
+				onSecond(e);
+				m_timer.start();
+			}
+		}
+
+		public function onSecond(e:Event):void {
+			progress.text = player.getNowTimeStr() + " / " + player.getTotalTimeStr();
+			//progress.text = player.getNowTimeStr();
+			//voiceCount.text = "♪" + player.getVoiceCount();
+		}
+	]]>
+	</mx:Script>
+
+	<mx:Panel width="100%" height="100%" borderVisible="true" cornerRadius="0" creationPolicy="all"
+			  dropShadowVisible="false" paddingBottom="0" paddingLeft="10" paddingRight="10"
+			  paddingTop="10" title="FlMML customized">
+
+		<mx:TabNavigator id="tn" width="100%" height="100%" borderVisible="true" cornerRadius="0"
+						 dropShadowVisible="false" paddingBottom="8" paddingLeft="8"
+						 paddingRight="8" paddingTop="8">
+
+			<mx:VBox label="BROWSER">
+				<mx:Box direction="horizontal" width="100%" height="25">
+					<mx:TextInput id="currentTitle" width="100%" height="100%" editable="false" text="Title">
+					</mx:TextInput>
+				</mx:Box>
+				<mx:Box direction="horizontal" width="100%" height="25">
+					<mx:TextInput id="currentComment" width="100%" height="100%" editable="false" text="Comment">
+					</mx:TextInput>
+				</mx:Box>
+				<mx:Box direction="horizontal" width="100%" height="50">
+					<mx:TextArea id="warnings" width="100%" height="100%" fontSize="12" editable="false" text="">
+					</mx:TextArea>
+				</mx:Box>
+				<mx:Box direction="horizontal" width="100%" height="100%">
+					<mx:DataGrid id="playlist" width="100%" height="100%" dataProvider="{m_playlist}"
+								 doubleClickEnabled="true" dropShadowVisible="false" editable="false"
+								 fontSize="14" itemClick="openPlayItem(event);" showHeaders="false"
+								 sortableColumns="false"/>
+				</mx:Box>
+			</mx:VBox>
+
+			<mx:VBox label="MML-EDIT">
+				<mx:VDividedBox width="100%" height="100%">
+					<mx:TextArea id="input" width="100%" height="90%" fontSize="14" text="/*MML*/  L8 O5 CDEFGAB&gt;C">
+					</mx:TextArea>
+					<mx:TextArea id="warnings2" width="100%" height="10%" fontSize="12" editable="false" text="">
+					</mx:TextArea>
+				</mx:VDividedBox>
+			</mx:VBox>
+
+		</mx:TabNavigator>
+
+		<mx:Box direction="horizontal" width="100%" height="45" verticalAlign="middle">
+			<mx:Button id="playButton" label="Play" click="play();" height="35" />
+			<mx:Button id="stopButton" label="Stop" click="stop();" height="35" />
+			<mx:Label text=" " width="25" />
+			<mx:Label id="progress" text="" width="150" textAlign="center"/>
+			<mx:Label id="voiceCount" text="" width="30" textAlign="center"/>
+			<mx:Label text=" " width="100%" />
+			<mx:Label text="Volume:" fontSize="12" fontWeight="bold" textAlign="right"/>
+			<mx:HSlider id="hSlider" width="120" allowTrackClick="true"
+						change="player.setMasterVolume(hSlider.value);" dataTipPlacement="top"
+						labelOffset="0" labels="['min','max']" liveDragging="true" maximum="100"
+						minimum="0" snapInterval="1" tickColor="black" value="100"/>
+			<mx:Label text=" " width="10" />
+		</mx:Box>
+
+		<flmml:FlMML id="player" />
+
+	</mx:Panel>
+
+</mx:Application>

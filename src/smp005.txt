@@ -1,0 +1,17 @@
+﻿/*
+   ＦＣノイズ 再生サンプル
+*/
+
+t120
+@@5 @n0,5
+@ea&, n,1,15, n,10,13, r,8,0
+l4 q11,16
+o4
+
+@n0 cccr @n3 cccr @n6 cccr @n9 cccr @n12 cccr @n15 cccr
+rr
+
+/* ショートモード */
+@@5-1
+@n0 cccr @n3 cccr @n6 cccr @n9 cccr @n12 cccr @n15 cccr
+;

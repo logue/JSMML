@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<playlist>
+	<item url="plist0.xml">（親の階層へ戻る）</item>
+	<item url="smp100.txt">エンベロープ：音量エンベロープ</item>
+	<item url="smp101.txt">エンベロープ：音量エンベロープ #ENVCLOCK %</item>
+	<item url="smp102.txt">エンベロープ：音量エンベロープ @OEA</item>
+	<item url="smp110.txt">エンベロープ：フィルタエンベロープ</item>
+	<item url="smp120.txt">エンベロープ：デューティー比エンベロープ</item>
+</playlist>
