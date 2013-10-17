@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja">
+<html>
+	<head>
+		<meta charset="UTF-8" />
+		<title>JSMML Customized Sample</title>
+		<link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet" />
+		<link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-theme.min.css" rel="stylesheet" />
+	</head>
+	<body>
+		
+		<div class="container">
+			<div class="header">
+				<ul class="nav nav-pills pull-right">
+					<li><a href="index.html">JSMML Sample</a></li>
+					<li class="active"><a href="jsmml_customized.html">JSMML Customized Sample</a></li>
+					<li><a href="https://github.com/logue/JSMML">GitHub</a></li>
+					<li><a href="https://github.com/logue/JSMML/archive/customize.zip">Download</a></li>
+				</ul>
+				<h3 class="text-muted">JSMML Customized Sample</h3>
+			</div>
+			<hr class="clearfix" />
+			<div class="panel panel-primary">
+				<div class="panel-heading">Textarea Player</div>
+				<div class="panel-body">
+					<div class="row">
+						<div class="col-sm-2">
+							<button class="btn btn-primary" value="play" id="play" disabled="disabled" title="Play / Pause"><span class="glyphicon glyphicon-play"></span></button>
+							<button class="btn btn-danger" value="stop" id="stop" disabled="disabled" title="Stop"><span class="glyphicon glyphicon-stop"></span></button>
+						</div>
+						<div class="col-sm-3">
+							<select id="files" class="form-control"></select>
+						</div>
+						<div class="col-sm-3">
+							<div class="form-group">
+								<div class="input-group">
+									<span class="input-group-addon"><span class="glyphicon glyphicon-volume-down"></span></span>
+									<input id="volume" type="range" class="form-control input-sm" min="0" max="127" step="1" value="127" title="Master Volume" />
+									<span class="input-group-addon"><span class="glyphicon glyphicon-volume-up"></span></span>
+								</div>
+							</div>
+						</div>
+						<div class="col-sm-2">
+							<div class="progress progress-striped" id="progress" title="Music Progress">
+								<div class="progress-bar" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width: 100%;">
+								</div>
+							</div>
+						</div>
+						<div class="col-sm-2">
+							<span id="cast" title="Cast time">00:00 / 00:00</span>
+						</div>
+					</div>
+					<textarea id="ta" rows=8 cols=50 class="form-control"></textarea>
+				</div>
+			</div>
+			<div class="panel panel-info">
+				<div class="panel-heading">Info</div>
+				<div class="panel-body row">
+					<dl class="dl-horizontal col-md-6">
+						<dt>Title</dt>
+						<dd id="mml-title"></dd>
+						<dt>Artist</dt>
+						<dd id="mml-artist"></dd>
+						<dt>Comment</dt>
+						<dd id="mml-comment"></dd>
+						<dt>Coding</dt>
+						<dd id="mml-coding"></dd>
+					</dl>
+					<div class="col-md-6">
+						<pre id="mml-warning"></pre>
+					</div>
+				</div>
+			</div>
+		</div>
+		<script type="text/javascript" src="//codeorigin.jquery.com/jquery-1.10.2.min.js"></script>
+		<script type="text/javascript" src="//netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+		<script type="text/javascript" src="./JSMML.min.js"></script>
+		<script type="text/javascript" src="./unzip.min.js"></script>
+		<script type="text/javascript" src="./utf8.js"></script>
+		<script type="text/javascript" defer="defer">/*<![CDATA[*/
+var mml;
+var loaded = false;
+JSMML.swfurl = './JSMML_customized.swf';
+
+$(document).ready(function(){
+	$('#progress').addClass('active');
+	loadSample();
+	// JSMMLのonLoad時に処理を実装すること
+	JSMML.onLoad = function() {
+		mml = new JSMML();
+		$('.btn, input, textarea').removeAttr('disabled');
+		console.info(JSMML);
+
+		// 再生／一時停止ボタン
+		$('#play').click(function(){
+			if (loaded){
+				if (mml.isPlaying()) {	// 停止中
+					// 停止
+					mml.pause();
+				}else{			// 再生中
+					// 再生
+					mml.play();
+				}
+			}else{
+				$('#progress').removeClass('progress-striped').removeClass('active');
+				mml.play($('#ta').val());
+				loaded = true;
+			}
+		});
+		// 停止ボタン
+		$('#stop').click(function(){
+			mml.stop();
+			$('#progress').children('.progress-bar').css('width','0%');
+			loaded = false;
+		});
+		
+		// マスターボリューム
+		$('#volume').change(function(){
+			var value = $(this).val();
+			mml.setMasterVolume(value);
+		});
+		
+		$('#files').change(function(){
+			var filename = $('#files option:selected').data('filename');
+
+			if (filename) {
+				var buffer = document.getElementById('files').zip.decompress(filename);
+				// arrayBufferをUTF8文字列としてテキストエリアに出力
+				$('#ta').val(utf8.bytesToString(buffer));
+			} else {
+				mml.stop();
+			}
+		});
+		
+		var isFinish = false;
+		// MMLの再生が終了したとき再生終了フラグを立てる
+		mml.onFinish = function() {
+			isFinish = true;
+		}
+		
+		$('#mml-warning').removeClass('alert-warning');
+		// MMLのコンパイルが終了した
+		mml.onCompiled = function(){
+			// メタ情報を取得
+			$('#mml-title').text(mml.getMetaTitle());
+			$('#mml-artist').text(mml.getMetaArtist());
+			$('#mml-comment').text(mml.getMetaComment());
+			$('#mml-coding').text(mml.getMetaCoding());
+			// MMLの警報を取得
+
+			if (warning !== '') {
+				$('#mml-warning').text(warning);
+			}else{
+				$('#mml-warning').text('');
+			}
+			$('#progress').removeClass('active');
+		}
+		// MMLをバッファリングしている
+		// TODO:進捗率
+		mml.onBuffering = function(){
+			$('#progress').removeClass('progress-striped');
+		}
+		// プログレスバーとタイム
+		setInterval(function(){
+			// MMLが再生中かをチェック
+			if (mml.isPlaying()) {
+				// 時間進行
+				$('#cast').text(mml.getNowTimeStr()+' / '+mml.getTotalTimeStr());
+				// 進捗率
+				$('#progress').children('.progress-bar').css('width',(mml.getNowMSec()/mml.getTotalMSec()*100)+'%');
+				// ボタンの表示はこっちでコントロールする
+				$('#play').
+					html('<span class="glyphicon glyphicon-pause"></span>').
+					removeClass('btn-primary').
+					addClass('btn-success');
+			}else{
+				$('#play').
+					html('<span class="glyphicon glyphicon-play"></span>').
+					removeClass('btn-success').
+					addClass('btn-primary');
+				
+			}
+		},200);
+	}
+});
+
+// Zipファイルを解凍しselectタグの要素にファイル名を入れる
+function loadSample() {
+	var xhr = new XMLHttpRequest();
+	var url = "sample.zip";
+	xhr.open('GET', url, true);
+	xhr.addEventListener('load', function(ev) {
+		var input = new Uint8Array(xhr.response);
+
+		var select = document.getElementById('files');
+		while (select.childNodes.length > 0) {
+			select.removeChild(select.firstChild);
+		}
+		select.appendChild(document.createElement('option'));
+
+		var zip = select.zip = new Zlib.Unzip(input);
+		var filenames = zip.getFilenames();
+		filenames.forEach(function(name, i) {
+			if (name.substr(-4) !== '.txt') {
+				return;
+			}
+
+			var option = document.createElement('option');
+			option.textContent = name.split('/').pop();
+			option.setAttribute('data-filename', name);
+			select.appendChild(option);
+		});
+	});
+	xhr.responseType = 'arraybuffer';
+	xhr.send();
+}
+
+// ページから出るときにメモリ解放
+$(window).unload(function(){
+	mml.destroy();
+});
+
+/*]]>*/</script>
+	</body>
+</html>
