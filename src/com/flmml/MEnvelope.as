@@ -338,7 +338,8 @@
 					if (!m_playing) { samples[i] = 0.0; continue; }		//非演奏中は無音で満たす
 					ex = getNextAmplitudeLinear();
 					
-					amplitude = Math.pow( 10.0, (((ex - 1.0) * vMax * vRate) / 20.0) );
+					if (ex > 0.0) { amplitude = Math.pow( 10.0, (((ex - 1.0) * vMax * vRate) / 20.0) ); }
+					else          { amplitude = 0.0; }
 					
 					if (amplitude > 1.0) amplitude = 1.0;
 					samples[i] *= (ampLevel * amplitude);
