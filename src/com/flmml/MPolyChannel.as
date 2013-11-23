@@ -156,6 +156,10 @@
 			for (var i:int = 0; i < m_voiceLen; i++) m_voices[i].setLFO(target, paramA, spt);
 		}
 
+		public function setLFOrestart(target:int):void {
+			for (var i:int = 0; i < m_voiceLen; i++) m_voices[i].setLFOrestart(target);
+		}
+
 		public function setLPF(swt:int, paramA:Array):void {
 			for (var i:int = 0; i < m_voiceLen; i++) m_voices[i].setLPF(swt, paramA);
 		}

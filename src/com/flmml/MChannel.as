@@ -289,7 +289,9 @@
 			//for LFO
 			((MOscLTable)(m_oscModL[LFO_TARGET_YCONTROL])).setWaveNo1st();
 			for (i = 0; i < LFO_MAX; i++) {
-				m_oscModL[i].resetPhase();
+				if (m_lfoDelay[i] >= 0.0) {
+					m_oscModL[i].resetPhase();
+				}
 			}
 			m_onCounter = 0;
 			//for ENVELOPE
@@ -576,8 +578,6 @@
 			var widthSMP:Number;
 			var i:int, j:int;
 			
-			valid = true;
-			
 			// target check
 			switch (target) {
 			case LFO_TARGET_PITCH:
@@ -585,6 +585,7 @@
 			case LFO_TARGET_FILTER:
 			case LFO_TARGET_PANPOT:
 			case LFO_TARGET_YCONTROL:
+				valid = true;
 				break;
 			default:
 				valid = false;
@@ -643,7 +644,7 @@
 				break;
 			case LFO_TARGET_PANPOT:
 				if (dp > 200.0) dp = 200.0;
-				dp = dp / 100.0;
+				dp = dp * (0.5 / 100.0);		//m_panは0.5中心の0.0～1.0推移のため、振幅0.5のスケールに合わせる。
 				m_lfoDepth[target] = dp * sign;
 				break;
 			case LFO_TARGET_YCONTROL:
@@ -728,11 +729,16 @@
 			}
 
 			// parameter set: delay
-			if (s_LFOclockMode == true) {
-				m_lfoDelay[target] = (delay * s_LFOclockMgnf) * spt;
+			if (delay >= 0.0) {
+				if (s_LFOclockMode == true) {
+					m_lfoDelay[target] = (delay * s_LFOclockMgnf) * spt;
+				}
+				else {
+					m_lfoDelay[target] = delay * (44100.0 * s_LFOclock);
+				}
 			}
 			else {
-				m_lfoDelay[target] = delay * (44100.0 * s_LFOclock);
+				m_lfoDelay[target] = (-1.0);		//ノートオン非同期モード
 			}
 
 			// parameter set: attack（実装検討中）
@@ -750,6 +756,25 @@
 			}
 
 			//ＬＦＯディレイ用カウンタをクリア（タイ中のＬＦＯ再設定を想定）
+			m_onCounter = 0;
+		}
+		public function setLFOrestart(target:int):void {
+			var valid:Boolean;
+			// target check
+			switch (target) {
+				case LFO_TARGET_PITCH:
+				case LFO_TARGET_AMPLITUDE:
+				case LFO_TARGET_FILTER:
+				case LFO_TARGET_PANPOT:
+				case LFO_TARGET_YCONTROL:
+					valid = true;
+					break;
+				default:
+					valid = false;
+			}
+			if (valid == false) return;
+			
+			m_oscModL[target].resetPhase();
 			m_onCounter = 0;
 		}
 		public function setLPF(swt:int, paramA:Array):void {
@@ -942,15 +967,21 @@
 
 		public function getSamples(samples:Vector.<Number>, max:int, start:int, delta:int):void {
 			var end:int = start + delta;
+			var s:int, e:int;
 			var trackBuffer:Vector.<Number> = s_samples;
-			var amplitude:Number, rightAmplitude:Number;
-			var playing:Boolean = isPlaying(), tmpFlag:Boolean;
-			var vol:Number, freqNo:int, lpffrq:Number, depth:Number, depth2:Number, Vscale:Number, Vrate:Number;
-			var pan:Number;
-			var i:int, j:int, s:int, e:int;
-			if (end >= max) end = max;
+			var playing:Boolean = isPlaying();
+			var tmpFlag:Boolean;
+			var freqNo:int;
+			var depth:Number, depth2:Number;
+			var vol:Number, Vscale:Number, Vrate:Number;
+			var lpffrq:Number;
 			var key:Number = getFrequency(m_freqNo);
+			var pan:Number;
+			var amplitude:Number, rightAmplitude:Number;
+			var i:int, j:int;
 			var onCounter:int;
+
+			if (end >= max) end = max;
 
 			// sound generate & portamento & pitch LFO & Y-Control LFO & PWM envelope
 			if (playing) {
@@ -1159,7 +1190,7 @@
 					//Delay[ON] PanLFO[ON]
 					depth = m_lfoDepth[LFO_TARGET_PANPOT];
 					onCounter = m_onCounter;
-					pan = m_pan;
+					pan = m_pan;						//m_panは0.5中心の0.0～1.0で推移。幅が0.5であることに注意。
 					//LFO入力波形は、0.0を中心に-1.0～1.0を行き来するモジュール
 					for (i = start; i < end; i++) {
 						j = i + i;
@@ -1202,7 +1233,7 @@
 						//Delay[OFF] PanLFO[ON]
 						depth = m_lfoDepth[LFO_TARGET_PANPOT];
 						onCounter = m_onCounter;
-						pan = m_pan;
+						pan = m_pan;						//m_panは0.5中心の0.0～1.0で推移。幅が0.5であることに注意。
 						//LFO入力波形は、0.0を中心に-1.0～1.0を行き来するモジュール
 						for (i = start; i < end; i++) {
 							j = i + i;

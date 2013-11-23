@@ -19,7 +19,7 @@ package {
 
 	[SWF(frameRate="30")]
 	public class JSMML extends Sprite {
-		public static const VERSION:String = 'Customized #27615';
+		public static const VERSION:String = 'Customized #27977';
 
 //		private var debug:Boolean = false;
 

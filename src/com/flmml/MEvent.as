@@ -86,6 +86,9 @@
 		public function setLFO(target:int, paramA:Array):void {
 			set(MStatus.LFO,           target, 0, 0.0, paramA);
 		}
+		public function setLFOrestart(target:int):void {
+			set(MStatus.LFO_RESTART,   target, 0, 0.0, null);
+		}
 		public function setLPF(swt:int, paramA:Array):void {
 			set(MStatus.LPF,           swt, 0, 0, paramA);
 		}
@@ -165,6 +168,7 @@
 		public function getEnvelopeApoints():Array	{ return m_dataX; }
 		public function getLFOtarget():int			{ return m_data0; }
 		public function getLFOparams():Array		{ return m_dataX; }
+		public function getLFOrestartTarget():int	{ return m_data0; }
 		public function getLPFswt():int				{ return m_data0; }
 		public function getLPFparams():Array		{ return m_dataX; }
 		public function getVowel():int				{ return m_data0; }		//Formant

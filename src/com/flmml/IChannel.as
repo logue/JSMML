@@ -22,6 +22,7 @@
 		function setPhaseRMode(mode:int, phase:Number):void;
 		function setEnvelope(dest:int, lvRd_mode:int, atk_mode:Boolean, initlevel:Number, evPoints:Array):void;
 		function setLFO(target:int, paramA:Array, spt:Number):void;
+		function setLFOrestart(target:int):void;
 		function setLPF(swt:int, paramA:Array):void;
 		function setFormant(vowel:int):void;
 		function setPWM(pwm:Number, mode:int):void;

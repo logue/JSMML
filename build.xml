@@ -11,7 +11,7 @@
 
     <!-- create swf-->
     <target name="build.swf" depends="clean">
-        <exec executable="${FLEX3_HOME}/amxmlc.bat" failonerror="true">
+        <exec executable="amxmlc.bat" failonerror="true">
             <arg line="-default-size ${width} ${height}" />
             <arg line="-default-frame-rate ${framerate}" />
             <arg line="-default-background-color ${bgcolor}" />

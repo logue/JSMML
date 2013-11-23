@@ -164,6 +164,9 @@
 							case MStatus.LFO:
 								m_ch.setLFO(e.getLFOtarget(), e.getLFOparams(), m_spt);
 								break;
+							case MStatus.LFO_RESTART:
+								m_ch.setLFOrestart(e.getLFOrestartTarget());
+								break;
 							case MStatus.LPF:
 								m_ch.setLPF(e.getLPFswt(), e.getLPFparams());
 								break;
@@ -577,6 +580,12 @@
 		public function recLFO(target:int, paramA:Array):void {
 			var e:MEvent = makeEvent();
 			e.setLFO(target, paramA);
+			pushEvent(e);
+		}
+
+		public function recLFOrestart(target:int):void {
+			var e:MEvent = makeEvent();
+			e.setLFOrestart(target);
 			pushEvent(e);
 		}
 

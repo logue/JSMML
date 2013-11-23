@@ -679,7 +679,7 @@
 					var lPset:Array = new Array();
 					var lFail:int = 0;
 					next();
-					switch(getChar()) {
+					switch(getChar()) {						//注：@rl(restart LFO)にも同様のtarget確認有り
 					case 'p': lDest = 0; next(); break;
 					case 'a': lDest = 1; next(); break;
 					case 'f': lDest = 2; next(); break;
@@ -702,7 +702,7 @@
 								}
 								if (getChar() == ',') {
 									next();
-									lDl = getUNumber(lDl);
+									lDl = getSNumber(lDl);
 								}
 							}
 						}
@@ -727,7 +727,7 @@
 											lYtb2 = getSInt(lYtb2);
 											if (getChar() == ',') {
 												next();
-												lDl = getUNumber(lDl);
+												lDl = getSNumber(lDl);
 											}
 										}
 									}
@@ -911,6 +911,28 @@
 					else {
 						//同トラック内での複数要求は認めない
 						warning("[Track:" + m_trackNo + "] ", MWarning.ERR_IREPEAT_TIMES,"");
+					}
+				}
+				else if (c0 == 'l') {
+					// @rl: restart LFO
+					next();
+					o = (-1);
+					c1 = getChar();
+					switch(c1) {
+						case 'p': o = 0; next(); break;
+						case 'a': o = 1; next(); break;
+						case 'f': o = 2; next(); break;
+						case 'b': o = 3; next(); break;
+						case 'y': o = 4; next(); break;
+						default: o = (-1);
+					}
+					if (o >= 0) {
+						m_tracks[m_trackNo].recLFOrestart(o);
+					}
+					else {
+						// 未定義コマンド
+						warning("[Track:" + m_trackNo + "] ", MWarning.UNKNOWN_COMMAND, "@"+c+c0+c1);
+						next();
 					}
 				}
 				else {
