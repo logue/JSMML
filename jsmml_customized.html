@@ -50,7 +50,224 @@
 							<span id="cast" title="Cast time">00:00 / 00:00</span>
 						</div>
 					</div>
-					<textarea id="ta" rows=8 cols=50 class="form-control"></textarea>
+					<textarea id="ta" rows=8 cols=50 class="form-control">#TITLE   Tower of Heaven - Luna Ascension - (C)flashygoodness 2010
+#CODING  LinearDrive
+#COMMENT music dictation by 座間野 / for FlMML customized c.s.27615 or later
+
+#TICKUNIT 384
+#ENVCLOCK 60
+#ENVRESOL =
+#LFOCLOCK %
+
+
+/*          loop cmpl Dofs Ddnm Wmod Wdnm */
+#LFOTABLE 1 {  1,   0,   0,   1,   0,   1,
+             -500,  0 }
+#LFOTABLE 2 {  1,   0,   0,   1,   0,   1,
+             0.25,  1 }
+
+
+/*           12345678 9abcdef0 12345678 9abcdef0 */
+#WAVEM 0,1,4,BBBBFFBB 8888BB88 BBBBFFFB 88884400
+
+
+$INIT= vs30,1.5,0 o4 ns0 @ns0 @d0,100 l16 q16,16 @q0;
+$I_SQ= @@3-0 @w4,8 @ph1,0 $INIT;
+$I_WM= @@8-0 $INIT;
+$I_NZ= @@5-0 @n1,5 $INIT;
+
+
+/* rhythm */
+$E10= @ea&amp;, n,0,30, n,2,20, n,2,0, r,10,0;
+$E20= @ea&amp;, n,0,28, n,10,24, n,5,0, r,10,0;
+$E50= @ea&amp;, n,0,30, n,4,22, n,4,0, r,10,0;
+$E60= @ea&amp;, n,0,30, n,10,24, n,10,0, r,10,0;
+$H= $E10 @n3 c;
+$O= $E20 @n3 c;
+$K= $E50 @n15 c;
+$S= $E20 @n6 c;
+$T= $E60 e;
+
+$MA=
+@rp
+   $I_NZ o3 v22
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   r4.. @@3-0 @lp-4800,96,1,0 )4 $T $Tr$Tr $T$T$T$T (4 @lp0 @@5-0
+
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   /:16 $H :/
+   r4.. @@3-0 @lp-4800,96,1,0 )4 $T $Tr$Tr $T$T$T$T (4 @lp0 @@5-0
+;
+
+$MB=
+@rp
+   $I_NZ v26 @n3 $E20
+   rrrrrrrrrr $O8 rrrr
+   rrrr $O8 rrrr $O8 rr $O8
+   rrrrrrrrrr $O8 rrrr
+   rrrr $O8 rrrr $O8 rr $O8
+   rrrrrrrrrr $O8 rrrr
+   rrrr $O8 rrrr $O8 rr $O8
+   rrrrrrrrrr $O8 rrrr
+   $O8.r$O8.$O $S8 $S8 $S $S $S $S
+
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $Kr$Kr $S8 $K $S $K $S $K8 $S8 $K $S
+   $O8.r$O8.$O $S8 $S8 $S $S $S $S
+;
+
+
+/* melo */
+$E100= @ea&amp;, n,0.5,30, n,3,27, r,10,0   @lp12,36,2,72;
+$DLY= @dly343,-6;
+$MC=
+@rp
+   $I_SQ o4 v28 NS2 L8 $E100 @@1-0 $DLY
+   b&gt;dea4de4&amp;
+   e&lt;a&gt;c+d4d+64&amp;e16..c+&lt;a
+   &gt;c+4.&lt;b4.f+4&amp;
+   f+2.b16&gt;e16f+16a16
+   &gt;c64&amp;c+4&amp;16..&lt;b4.&gt;f64&amp;f+8...
+   e4ac+4d4e
+   c+.d.c+&lt;a.&gt;c+.&lt;b&amp;
+   b1
+   @@3-0 @w4,8 c+4.&lt;b&amp;2
+   &gt;d4.c+4&amp;16d32&amp;d+32&amp;e8.&lt;b32&amp;b-32&amp;
+   a2&amp;ae4d&amp;
+   dc+da&amp;2
+   &gt;c+4.&lt;b4.&gt;ea&amp;
+   a4f+&gt;c+2&lt;b16a16
+   &gt;e4&amp;16e-32&amp;d32&amp;c+&amp;2
+   a4&amp;16a-32&amp;g32&amp;f+4.a..a+32&amp;
+   b1
+   &amp;1
+   L16 (( &lt;&lt;b&gt;df+ab&gt;df+a  baf+d&lt;baf+d
+   &lt;b&gt;ef+ab&gt;ef+a  baf+e&lt;baf+e ))
+   &gt;a32&amp;b2....
+   &amp;1
+   &lt;&lt;&lt;b&gt;df+a&gt;c+&lt;a&gt;ec+  ae&gt;c+&lt;a&gt;ec+ae
+   &gt;c+2 L32 c&lt;bb-aa-gg-fee-dd-c&lt;bb-a
+;
+
+$E200= @ea&amp;, n,0.5,30, n,3,27, r,2,0;
+$MD=
+@rp
+   $I_SQ o4 v26 NS2 L16 $E200 $DLY
+
+   r1
+   r1
+   r1
+   r1
+
+   (( @lp0 @la0 @w4,8
+   gb&gt;df+gb&gt;df+ &lt;&lt;b&gt;df+gb&gt;df+b
+   &lt;&lt;f+a&gt;c+ef+a&gt;c+e &lt;&lt;a&gt;c+ef+a&gt;c+ef+
+   r1
+   ) bf+c+&lt;b&gt;f+c+&lt;bf+ &gt;c+&lt;bf+c+bf+c+&lt;b (
+
+   &lt;gb&gt;df+gb&gt;df+ gf+d&lt;bgf+d&lt;b
+   a&gt;c+ea&gt;c+eab &gt;c+&lt;barec+&lt;ae
+   f+a&gt;c+ef+a&gt;c+e f+ec+&lt;af+ec+&lt;a
+   b&gt;df+a&gt;c+ea&gt;c+ &lt;&lt;&lt;a&gt;c+ea&gt;c+ea&gt;c+
+
+   &lt;&lt;&lt;&lt; gb&gt;df+gb&gt;df+ gf+d&lt;bgf+d&lt;b
+   a&gt;c+ea&gt;c+eab &gt;c+&lt;baec+&lt;bae
+   ab&gt;c+eab&gt;c+e aec+&lt;baec+&lt;b
+   a&gt;c+ea&gt;c+ea&gt;c+ ec+&lt;aec+&lt;aec+
+
+   @lp1,6,5-1,0 @la1,6,5-2,0 @w0.25,1 &lt;
+   r8 )) brabrbrbbrarbr
+   r8brabrbrbbrabrb
+   r8brabrbrbbrarbr
+   r8brabrbrbbrabrb
+
+   r8brabrbrbbrarbr
+   r8brabrbrbbrabrb
+   r8brabrbrbbrarbr
+   r1
+;
+
+
+
+/* bass */
+$E300= @ea&amp;, n,0.5,30, n,3,27, n,2000,0, r,1.5,0;
+$ME=
+@rp
+   $I_WM @0 o1 v30 L16 $E300
+   @q0 a1
+   g+1
+   &gt;c+1
+   &lt;b1
+
+   &gt; @q8 ( a8. ( a8. ( a8. ( a8. ( a8. ( a )6
+   ( g+8. ( g+8. ( g+8. ( g+8. ( g+8. ( g+ )6
+   @q0 c+8rf+8rg+8&gt;c+8rf+8rg+8
+   &gt;&gt; @q1 (2 c+&lt;g+d+c+ g+d+c+&lt;g+ &gt;d+c+&lt;g+d+ &gt;c+&lt;g+d+c+ )2
+
+   &lt;&lt; aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;a
+   aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;a
+   g+g+&gt;g+&lt;g+g+&gt;g+&lt;g+g+&gt;g+&lt;g+g+&gt;g+&lt;g+g+&gt;g+&lt;g+
+   &gt; c+c+&gt;c+&lt;c+c+&gt;c+&lt;c+c+ b&lt;bb&gt;b&lt;bb&gt;b&lt;b
+
+   aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;a
+   aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;a
+   &gt; c+c+&gt;c+&lt;c+c+&gt;c+&lt;c+c+&gt;c+&lt;c+c+&gt;c+&lt;c+c+&gt;c+&lt;c+
+   &lt; bb&gt;b&lt;bb&gt;b&lt;bb&gt;b&lt;bb&gt;b&lt;bb&gt;b&lt;b
+
+   aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;a
+   bb&gt;b&lt;bb&gt;b&lt;bb&gt;b&lt;bb&gt;b&lt;bb&gt;b&lt;b
+   &gt; c+c+&gt;c+&lt;c+c+&gt;c+&lt;c+c+&gt;c+&lt;c+c+&gt;c+&lt;c+c+&gt;c+&lt;c+
+   &lt; g+g+&gt;g+&lt;g+g+&gt;g+&lt;g+g+&gt;g+&lt;g+g+&gt;g+&lt;g+g+&gt;g+&lt;g+
+
+   aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;aa&gt;a&lt;a
+   bb&gt;b&lt;bb&gt;b&lt;bb&gt;b&lt;bb&gt;b&lt;bb&gt;b&lt;b
+   &gt;c+2..&lt;f+g+
+   ) c+1 (
+;
+
+
+/* play */
+t138
+mv0 $MA;
+mv0 $MB;
+mv0 $MC;
+mv0 $MD;
+mv0 $ME;
+
+
+/* EOF */</textarea>
 				</div>
 			</div>
 			<div class="panel panel-info">
