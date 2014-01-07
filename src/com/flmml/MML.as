@@ -151,9 +151,9 @@
 				if (checkLimitOfPlayTime(tick) == true) {
 					
 					if (m_portamento == 1) { // ポルタメントなら
-						m_tracks[m_trackNo].recPortamento(m_beforeNote - (noteNo + m_octave * 12), tick);
+						m_tracks[m_trackNo].recPortamento(m_beforeNote - (noteNo + (m_octave * 12)), tick);
 					}
-					m_tracks[m_trackNo].recNote(noteNo + m_octave * 12, tick, keyon, m_keyoff);
+					m_tracks[m_trackNo].recNote(noteNo + (m_octave * 12), tick, keyon, m_keyoff);
 					if (m_portamento == 1) { // ポルタメントなら
 						m_tracks[m_trackNo].recPortamento(0, 0);
 						m_portamento = 0;
@@ -885,8 +885,12 @@
 							else {
 								baseNote = getUInt(60);
 							}
-							if (baseNote < 0) baseNote = 0;
-								if (baseNote > 127) baseNote = 127;
+							if (baseNote < 0) {
+								baseNote = 0;
+							}
+							else if (baseNote > 120) {
+								baseNote = 120;
+							}
 							m_tracks[m_trackNo].recPortBase(baseNote);
 						}
 						break;
@@ -903,6 +907,7 @@
 					if (m_tracks[m_trackNo].m_IRepeatF == false) {
 						m_tracks[m_trackNo].m_IRepeatF = true;
 						m_tracks[m_trackNo].m_IRepeatGtReq = m_tracks[m_trackNo].getRecGlobalTick();
+						m_tracks[m_trackNo].m_IRepeatStOct = m_octave;
 						//テンポ管理トラックへも上書き通知。テンポ管理トラックでは最終要求トラックの状態を持つ。
 						m_tracks[MTrack.TEMPO_TRACK].m_IRepeatF = true;
 						m_tracks[MTrack.TEMPO_TRACK].m_IRepeatGtReq = m_tracks[m_trackNo].getRecGlobalTick();
@@ -992,15 +997,43 @@
 			case 'b': note(11); break;
 			case 'r': rest();   break;
 			case 'o': // Octave
-				m_octave = getUInt(m_octave);
-				if (m_octave < 0) m_octave = 0;
-				if (m_octave > 9) m_octave = 9;
+				m_octave = getSInt(m_octave);
+				if (m_octave < 0) {
+					m_octave = 0;
+					m_warning += "[Track:" + m_trackNo + "] オクターブ指定値が小さすぎるため下限値 0 に制限します。\n";
+				}
+				else if (m_octave > 9) {
+					m_octave = 9;
+					m_warning += "[Track:" + m_trackNo + "] オクターブ指定値が大きすぎるため上限値 9 に制限します。\n";
+				}
 				break;
 			case '>' : // octave shift
-				if (m_relativeDir == false) m_octave++; else m_octave--;
+				if (m_relativeDir == false) {
+					m_octave++;
+					if (m_octave > 9) {
+						m_warning += "[Track:" + m_trackNo + "] 相対オクターブ指定が上限を超えました。(" + m_octave + ")\n";
+					}
+				}
+				else {
+					m_octave--;
+					if (m_octave < 0) {
+						m_warning += "[Track:" + m_trackNo + "] 相対オクターブ指定が下限を下回りました。(" + m_octave + ")\n";
+					}
+				}
 				break;
 			case '<': // octave shift
-				if (m_relativeDir == false) m_octave--; else m_octave++;
+				if (m_relativeDir == false) {
+					m_octave--;
+					if (m_octave < 0) {
+						m_warning += "[Track:" + m_trackNo + "] 相対オクターブ指定が下限を下回りました。(" + m_octave + ")\n";
+					}
+				}
+				else {
+					m_octave++;
+					if (m_octave > 9) {
+						m_warning += "[Track:" + m_trackNo + "] 相対オクターブ指定が上限を超えました。(" + m_octave + ")\n";
+					}
+				}
 				break;
 			case '@':
 				atmark();
@@ -1196,6 +1229,10 @@
 
 		protected function finalizeTrack():void {
 			m_tracks[m_trackNo].enableDelayEffectBuffer(m_delayCountMax);		//ディレイ未使用の場合にも０の旨、通知
+			if (m_tracks[m_trackNo].m_IRepeatF == true) {
+				//無限リピート有効時のトラック終端オクターブ記録（デバッグ表示用）
+				m_tracks[m_trackNo].m_IRepeatEdOct = m_octave;
+			}
 		}
 
 		protected function getCharNext():String {
@@ -2732,10 +2769,9 @@
 		}
 
 		public function reportTotalTicksEveryTrack():void {
-			var tt:uint;
-			var re:uint;
-			var rt:uint;
-			m_warning += "<report> Total Ticks\n";
+			var tt:uint, re:uint, rt:uint;
+			var rSoct:int, rEoct:int;
+			m_warning += "<report> Total Ticks (@rp-oct)\n";
 			for (var i:int = MTrack.TEMPO_TRACK; i < m_tracks.length; i++) {
 				tt = m_tracks[i].reportTotalTicks();
 				m_warning += "Track" + i + " : " + tt;
@@ -2759,7 +2795,9 @@
 					if (m_tracks[i].m_IRepeatF == true) {
 						re = m_tracks[i].m_IRepeatGtReq;
 						rt = tt - re;
-						m_warning += " / repEntry:" + re + ", repTotal:" + rt;
+						rSoct = m_tracks[i].m_IRepeatStOct;
+						rEoct = m_tracks[i].m_IRepeatEdOct;
+						m_warning += " / repEntry:" + re + ", repTotal:" + rt + "  (oct:rp=" + rSoct + ",ed=" + rEoct + ")";
 					}
 					else {
 						m_warning += " / no Repeat";

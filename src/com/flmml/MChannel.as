@@ -2,8 +2,9 @@
 	import __AS3__.vec.Vector;
 
 	public class MChannel implements IChannel {
-		public static const  NOTE_LIMIT:int         = 120;			//o10cに満たないノートのみにする。o10c=16.7kHz
 		public static const  DEFAULT_P_RESO:int     = 100;			//default pitch resolution=100(1cent)
+		public static const  NOTE_LIMIT_MAX:int     = 120;			//o10c 以下のノートにする。o4a=440Hzのときo10c=16.7kHz
+		public static const  NOTE_LIMIT_MIN:int     = (-3);			//o(-1)a 以上のノートにする。o4a=440Hzのときo(-1)a=13.75Hz
 		public static var    s_BaseNote:Number      = 57.0;			//基準になる音階。o0c=0,o4c=48,o4a=57。メタデータから取得
 		public static var    s_BaseFreq:Number      = 440.0;		//基準音階にあてがう周波数をいくつにするか。メタデータから取得
 		public static var    s_LFOclockMode:Boolean = true;			//default:true。trueのとき、s_LFOclockは1tick（テンポ依存）。falseのとき、s_LFOclockは固定時間。
@@ -232,14 +233,15 @@
 			s_samples.fixed = true;
 		}
 		public function getFrequency(freqNo:int):Number {
+			var freqIdx:int = freqNo;
 			var freq:Number;
-			if (freqNo < 0) {
-				freqNo = 0;
+			if (freqIdx < (NOTE_LIMIT_MIN * m_pitchReso)) {
+				freqIdx = (NOTE_LIMIT_MIN * m_pitchReso);
 			}
-			if (freqNo >= (NOTE_LIMIT * m_pitchReso)) {
-				freqNo = (NOTE_LIMIT * m_pitchReso) -1;
+			else if (freqIdx > (NOTE_LIMIT_MAX * m_pitchReso)) {
+				freqIdx = (NOTE_LIMIT_MAX * m_pitchReso);
 			}
-			freq = s_BaseFreq * Math.pow(2.0, ( (Number(freqNo) - (s_BaseNote * Number(m_pitchReso))) / (12.0 * Number(m_pitchReso)) ) );
+			freq = s_BaseFreq * Math.pow(2.0, ( (Number(freqIdx) - (s_BaseNote * Number(m_pitchReso))) / (12.0 * Number(m_pitchReso)) ) );
 			return freq;
 		}
 		private function setPitchResolution(reso:int):void {

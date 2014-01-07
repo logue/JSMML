@@ -2,7 +2,7 @@
  * JSMML
  * Copyright (c) 2007      Yuichi Tateno <http://rails2u.com/>,
  *               2008      inudaisho <http://inudaisho.sakura.ne.jp/>
- *               2009-2013 Logue <http://logue.be/>
+ *               2009-2014 Logue <http://logue.be/>
  *
  * This software is released under the MIT License.
  * http://opensource.org/licenses/mit-license.php
@@ -19,7 +19,7 @@ package {
 
 	[SWF(frameRate="30")]
 	public class JSMML extends Sprite {
-		public static const VERSION:String = 'Customized #27977';
+		public static const VERSION:String = 'Customized #28425';
 
 //		private var debug:Boolean = false;
 

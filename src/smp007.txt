@@ -3,15 +3,16 @@
 */
 
 t120
-@@7 @n0,7
+@@7
 @ea&, n,1,15, n,10,13, r,8,0
 l4 q11,16
 o4
 /* ＰＣ８８モード */
+@nc0
  @n1 cr @n8 cr @n16 cr @n32 cr @n64 cr @n128 cr @n256 cr @n512 cr @n768 cr 
 rr
 
 /* ＦＭ７モード */
-@@7-3
+@nc3
  @n1 cr @n8 cr @n16 cr @n32 cr @n64 cr @n128 cr @n256 cr @n512 cr @n768 cr 
 ;

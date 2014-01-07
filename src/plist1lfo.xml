@@ -5,5 +5,6 @@
 	<item url="smp210.txt">ＬＦＯ：音量ＬＦＯ</item>
 	<item url="smp220.txt">ＬＦＯ：フィルタＬＦＯ</item>
 	<item url="smp230.txt">ＬＦＯ：パンポットＬＦＯ</item>
-	<item url="smp240.txt">ＬＦＯ：音程と音量のＬＦＯ同時有効</item>
+	<item url="smp240.txt">ＬＦＯ：ＹコントロールＬＦＯ</item>
+	<item url="smp250.txt">ＬＦＯ：音程と音量のＬＦＯ同時有効</item>
 </playlist>

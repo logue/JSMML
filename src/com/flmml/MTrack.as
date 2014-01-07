@@ -15,6 +15,8 @@
 		public  var m_IRepeatPt:int;
 		public  var m_IRepeatGt:uint;
 		public  var m_IRepeatGtReq:uint;
+		public  var m_IRepeatStOct:int;		//無限リピートエントリ時のオクターブ値（デバッグ表示用）
+		public  var m_IRepeatEdOct:int;		//無限リピート有効時のトラック終端オクターブ値（デバッグ表示用）
 		private var m_bpm:Number;         // beat per minute
 		private var m_spt:Number;         // samples per tick
 		private var m_ch:IChannel;        // channel (instrument)
