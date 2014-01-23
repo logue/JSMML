@@ -2,7 +2,6 @@
 	import __AS3__.vec.Vector;
 
 	public class MChannel implements IChannel {
-		public static const  DEFAULT_P_RESO:int     = 100;			//default pitch resolution=100(1cent)
 		public static const  NOTE_LIMIT_MAX:int     = 120;			//o10c 以下のノートにする。o4a=440Hzのときo10c=16.7kHz
 		public static const  NOTE_LIMIT_MIN:int     = (-3);			//o(-1)a 以上のノートにする。o4a=440Hzのときo(-1)a=13.75Hz
 		public static var    s_BaseNote:Number      = 57.0;			//基準になる音階。o0c=0,o4c=48,o4a=57。メタデータから取得
@@ -69,15 +68,11 @@
 		private var m_formant:MFormant;
 
 		private var m_mix_volume:Number;		// mixing volume
-		private var m_volMode:int;
-		private var m_vmode_max:int;			// 音量値の最大
-		private var m_vmode_index:int;			// 現在の音量
+		private var m_vmode_max:Number;			// 音量値の最大
+		private var m_vmode_index:Number;		// 現在の音量
 		private var m_vmode_rate:Number;		// 最大音量からの減衰レート（０のとき線形、正のときｄＢ）
 		private var m_vmode_vzmd:Boolean;		// ｄＢスケールの場合の v0 の処理モード。trueのときv0=無音。
-		private var m_vmode_c_index:int;		// エクスプレッションを加味した音量
 		private var m_volume:Number;			// volume     (max:1.0)
-		private var m_exp_index:int;			// 現在のエクスプレッション（最大とレートはvolumeのものを使う）
-		private var m_expression:Number;		// expression (max:1.0)
 		private var m_ampLevel:Number;			// amplifier level (max:1.0)
 
 		private var m_pan:Number;				// (left)0.0 ... 0.5(center) ... 1.0(right)
@@ -111,7 +106,7 @@
 		private var m_voiceid:Number;		// ボイスID for Poly
 
 		public function MChannel() {
-			m_pitchReso = DEFAULT_P_RESO;
+			m_pitchReso = MML.DEF_DETUNE_RESO;
 			m_noteNo = 0;
 			m_detune = 0;
 			m_freqNo = 0;
@@ -133,13 +128,10 @@
 			// MixingVol/Volume/Expression parameter stand by
 			m_mix_volume    = 1.0;
 			m_volume        = 1.0;
-			m_expression    = 1.0;
 			m_vmode_rate    = MML.DEF_VSRATE;
-			m_vmode_max     = MML.DEF_VSMAX;
-			m_vmode_index   = MML.DEF_VSMAX;			//スタンバイ時は最大。m_volumeの初期値との整合性のため。
-			m_exp_index     = MML.DEF_EXPRS;
+			m_vmode_max     = Number(MML.DEF_VSMAX);
+			m_vmode_index   = Number(MML.DEF_VSMAX);			//スタンバイ時は最大。m_volumeの初期値との整合性のため。
 			m_vmode_vzmd    = true;
-			m_vmode_c_index = m_vmode_index + m_exp_index;
 			// LFO stand by
 			m_oscSetL0 = new MOscillatorL();
 			m_oscSetL1 = new MOscillatorLA();
@@ -195,13 +187,12 @@
 			m_voiceid = 0.0;
 			setFormExec(MML.DEF_FORM, MML.DEF_SUBFORM);
 			setPWM(0.5, 0);
-			setDetune(0, DEFAULT_P_RESO);
+			setDetune(0, MML.DEF_DETUNE_RESO);
 			m_envForceTrigger = 0;
 			// 音量
-			setMixingVolume(MML.DEF_MIXVOL);				//setMixingVolume()を初めて呼ぶ場合に必ずm_volumeとm_expressionとm_vmode_rateをセットしておく。
-			setVolMode(MML.DEF_VSMAX, MML.DEF_VSRATE, 0);	//setVolMode()を初めて呼ぶ場合に必ずm_exp_indexをセットしておき、setMixingVolume()を行っておく。
+			setMixingVolume(MML.DEF_MIXVOL);				//setMixingVolume()を初めて呼ぶ場合に必ずm_volumeとm_vmode_rateをセットしておく。
+			setVolMode(MML.DEF_VSMAX, MML.DEF_VSRATE, 0);	//setVolMode()を初めて呼ぶ場合に必ずsetMixingVolume()を行っておく。
 			setVolume(MML.DEF_VOL);							//setVolume()を初めて呼ぶ場合に必ずsetVolMode()を行っておく。
-			setExpression(MML.DEF_EXPRS);					//setExpression()を初めて呼ぶ場合に必ずsetVolume()を行っておく。
 			setPan(0.0);
 			setPanLegacy(0);
 			// ノイズ周波数
@@ -374,89 +365,44 @@
 				//-100.0dB以下の指定は無音とみなす
 				m_mix_volume = 0.0;
 			}
-
-			if (m_vmode_rate == 0.0) {
-				//線形
-				m_ampLevel = m_mix_volume * (m_volume + m_expression);
-			}
-			else {
-				//ｄＢ
-				m_ampLevel = m_mix_volume * m_volume * m_expression;
-			}
-			((MOscOPMS)(m_oscSet1.getMod(MOscillator.OPMS))).setExpression(m_ampLevel); // 利得を含むゲイン
+			
+			m_ampLevel = m_mix_volume * m_volume;
+			((MOscOPMS)(m_oscSet1.getMod(MOscillator.OPMS))).setVolume(m_ampLevel); // 利得を含むゲイン
 		}
 		public function setVolMode(max:int, rate:Number, mode:int):void {
-			m_vmode_max  = max;
+			m_vmode_max  = Number(max);
 			m_vmode_rate = rate;
 			m_vmode_vzmd = (mode == 0) ? true : false;
-			if ( m_vmode_max < 7 )    m_vmode_max  = 7;
+			if ( m_vmode_max < 3.0 )  m_vmode_max  = 3.0;
 			if ( m_vmode_rate < 0.0 ) m_vmode_rate = 0.0;
 			m_vmode_index = m_vmode_max;
-			m_exp_index   = 0;
 			setVolume(m_vmode_max);
 		}
-		public function setVolume(vol:int):void {
+		public function setVolume(vol:Number):void {
 			m_vmode_index = vol;
-			if (m_vmode_index < 0)           m_vmode_index = 0;
+			if (m_vmode_index < 0.0)         m_vmode_index = 0.0;
 			if (m_vmode_index > m_vmode_max) m_vmode_index = m_vmode_max;
 			if (m_vmode_rate == 0.0) {
 				//線形
-				m_volume = Number(m_vmode_index) / Number(m_vmode_max);
+				m_volume = m_vmode_index / m_vmode_max;
 				if (m_volume > 1.0) m_volume = 1.0;
 				if (m_volume < 0.0) m_volume = 0.0;
 			}
 			else {
 				//ｄＢ
 				if ((m_vmode_index > 0) || (m_vmode_vzmd == false)) {
-					m_volume = Math.pow( 10.0, ((Number(m_vmode_index - m_vmode_max) * m_vmode_rate) / 20.0) );
+					m_volume = Math.pow( 10.0, (((m_vmode_index - m_vmode_max) * m_vmode_rate) / 20.0) );
 					if (m_volume > 1.0) m_volume = 1.0;
 				}
 				else {
+					//(m_vmode_index == 0) && (m_vmode_vzmd == true) の場合
 					m_volume = 0.0;
 				}
 			}
-			setExpression(m_exp_index);			//エクスプレッション上限下限の制限を想定して再計算しm_ampLevel決定。
-		}
-		public function setExpression(ex:int):void {
-			var current_x:int;
-			var amplevel:Number;
-
-			m_exp_index = ex;
-			if ((m_vmode_index + m_exp_index) < 0) {
-				current_x = m_vmode_index * (-1);				//合計結果が小さすぎる場合、レベル０に制限
-			}
-			else if ((m_vmode_index + m_exp_index) > m_vmode_max) {
-				current_x = m_vmode_max - m_vmode_index;		//合計結果が大きすぎる場合、最大音量に制限
-			}
-			else {
-				current_x = m_exp_index;
-			}
-			m_vmode_c_index = m_vmode_index + current_x;
-
-			//(m_vmode_index + current_x) を 0～m_vmode_max の範囲にしてからの下記。
-			//current_xは負数～正数。上限・下限は音量最大値と現在音量値に依存する。
-			//m_expressionは利得を含む場合があるので、0.0～1.0に制限できない。線形モードの場合は負数にもなりえる。
-			if (m_vmode_rate == 0.0) {
-				//線形
-				m_expression = Number(current_x) / Number(m_vmode_max);
-				amplevel = m_volume + m_expression;
-			}
-			else {
-				//ｄＢ
-				if ((m_vmode_c_index > 0) || (m_vmode_vzmd == false)) {
-					m_expression = Math.pow( 10.0, ((Number(current_x) * m_vmode_rate) / 20.0) );
-				}
-				else {
-					m_expression = 0.0;
-				}
-				amplevel = m_volume * m_expression;
-			}
-			if (amplevel > 1.0) amplevel = 1.0;
-			if (amplevel < 0.0) amplevel = 0.0;
-			//m_mix_volumeとその乗算結果には上限制限しないでおく。
-			m_ampLevel = m_mix_volume * amplevel;
+			//m_mix_volumeとの乗算結果には上限制限しないでおく（利得を含むため）。
+			m_ampLevel = m_mix_volume * m_volume;
 			if (m_ampLevel < 0.0) m_ampLevel = 0.0;
-			((MOscOPMS)(m_oscSet1.getMod(MOscillator.OPMS))).setExpression(m_ampLevel);		//利得を含む m_ampLevel を与える
+			((MOscOPMS)(m_oscSet1.getMod(MOscillator.OPMS))).setVolume(m_ampLevel);		//利得を含む m_ampLevel を与える
 		}
 		public function setPan(pan:Number):void {
 			// left -100.0 - 0.0 - 100.0 right
@@ -1045,9 +991,9 @@
 			// Amplitude Envelope
 			if (m_oscSet1.getForm() != MOscillator.OPMS) {
 				if(m_vmode_rate == 0.0){
-					m_envelope1.ampSamplesLinear(trackBuffer, start, end, m_ampLevel, m_mix_volume, m_volume, m_expression, m_vmode_rate, Number(m_vmode_c_index), Number(m_vmode_max));
+					m_envelope1.ampSamplesLinear(trackBuffer, start, end, m_ampLevel, m_mix_volume, m_volume, m_vmode_rate, m_vmode_index, m_vmode_max);
 				}else{
-					m_envelope1.ampSamplesNonLinear(trackBuffer, start, end, m_ampLevel, m_mix_volume, m_volume, m_expression, m_vmode_rate, Number(m_vmode_c_index), Number(m_vmode_max));
+					m_envelope1.ampSamplesNonLinear(trackBuffer, start, end, m_ampLevel, m_mix_volume, m_volume, m_vmode_rate, m_vmode_index, m_vmode_max);
 				}
 			}
 			else {

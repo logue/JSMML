@@ -233,7 +233,7 @@
 			}
 		}
 
-		public function ampSamplesLinear(samples:Vector.<Number>, start:int, end:int, ampLevel:Number, mixLevel:Number, volLevel:Number, expLevel:Number, vRate:Number, vIndex:Number, vMax:Number):void {
+		public function ampSamplesLinear(samples:Vector.<Number>, start:int, end:int, ampLevel:Number, mixLevel:Number, volLevel:Number, vRate:Number, vIndex:Number, vMax:Number):void {
 			var i:int;
 			var v:Number;
 			var ex:Number;
@@ -311,7 +311,7 @@
 						samples[i] *= (ampLevel * amplitude);
 					}
 					else {
-						//リリース中にvolumeとexpressionをキャンセル
+						//リリース中にvolumeをキャンセル
 						v = Math.floor(ex * vMax);
 						amplitude = v / vMax
 						
@@ -324,7 +324,7 @@
 			}
 		}
 
-		public function ampSamplesNonLinear(samples:Vector.<Number>, start:int, end:int, ampLevel:Number, mixLevel:Number, volLevel:Number, expLevel:Number, vRate:Number, vIndex:Number, vMax:Number):void {
+		public function ampSamplesNonLinear(samples:Vector.<Number>, start:int, end:int, ampLevel:Number, mixLevel:Number, volLevel:Number, vRate:Number, vIndex:Number, vMax:Number):void {
 			var i:int;
 			var v:Number;
 			var ex:Number;
@@ -402,7 +402,7 @@
 						samples[i] *= (ampLevel * amplitude);
 					}
 					else {
-						//リリース中にvolumeとexpressionをキャンセル
+						//リリース中にvolumeをキャンセル
 						v = Math.floor(ex * vMax);
 						if (v > 0.0) { amplitude = Math.pow( 10.0, (((v - vMax) * vRate) / 20.0) ); }
 						else         { amplitude = 0.0; }

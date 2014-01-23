@@ -59,11 +59,8 @@
 		public function setVolMode(max:int, rate:Number, mode:int):void {
 			set(MStatus.VOL_MODE,      max, mode, rate, null);
 		}
-		public function setVolume(vol:int):void {
-			set(MStatus.VOLUME,        vol, 0, 0.0, null);
-		}
-		public function setExpression(ex:int):void {
-			set(MStatus.EXPRESSION,    ex, 0, 0.0, null);
+		public function setVolume(vol:Number):void {
+			set(MStatus.VOLUME,        0, 0, vol, null);
 		}
 		public function setPan(p:Number):void {
 			set(MStatus.PAN,           0, 0, p, null);
@@ -152,8 +149,7 @@
 		public function getVolModeMAX():int			{ return m_data0; }
 		public function getVolModeRate():Number		{ return m_dataN; }
 		public function getVolModeVzMD():int		{ return m_data1; }
-		public function getVolume():int				{ return m_data0; }
-		public function getExpression():int			{ return m_data0; }
+		public function getVolume():Number			{ return m_dataN; }
 		public function getPan():Number				{ return m_dataN; }
 		public function getPanLegacy():int			{ return m_data0; }
 		public function getForm():int				{ return m_data0; }

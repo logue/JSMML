@@ -21,7 +21,6 @@ package com.flmml {
 		public  static var s_OpmRate:int = int(Math.round(s_OpmRateN));
 		public  static var s_Samprate:int = 44100;
 		private static var s_ClkRatio:Number;
-		private static var s_gainLV:Number = 0.0;					// 音源固有の振幅倍率（未初期化と見なす値を０とする）
 		private static var s_LvOfs:Number = Math.pow(2.0, (14.0 + 15.0));			//2^x,  x = PRECISION_BITS + SIZESINTBL_BITS + 2 - 2
 		
 		private static var s_KCtable:Vector.<int> = Vector.<int>([
@@ -101,7 +100,7 @@ package com.flmml {
 			DT3[OP3] = 0;
 			DT3[OP4] = 0;
 			lfo = new MOscOPMSlfo();
-			setExpression(1.0);			// m_ampLV,m_outputLVの初期設定
+			setVolume(1.0);				// m_ampLV,m_outputLVの初期設定
 			Reset();
 			setWaveNo(0);				// boot()で定義されたデフォルト音色を音源に設定
 			
@@ -114,14 +113,8 @@ package com.flmml {
 			s_ToneTable.fixed = true;
 			s_ToneTable[0] = defaultOPMS_Tone;
 			SetOpmClock(3579545.0);
-			setGain( 1.0 );
 			// -----
 			s_init = 1;
-		}
-		public static function setGain(val:Number):void {
-			var n:Number = val;
-			if (n < 0.0) n = 0.0;
-			s_gainLV = n;
 		}
 		public static function SetOpmClock(val:Number):void {
 			var rate:Number;
@@ -463,9 +456,9 @@ package com.flmml {
 			}
 		}
 		
-		public function setExpression(ex:Number):void {
+		public function setVolume(ex:Number):void {
 			m_ampLV = ex;
-			m_outputLV = s_gainLV * m_ampLV / s_LvOfs;
+			m_outputLV = m_ampLV / s_LvOfs;
 		}
 		public function IsPlaying():Boolean {
 			var f:Boolean;

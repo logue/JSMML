@@ -55,7 +55,7 @@
 			m_globalTick = 0;
 			m_signalInterval = (int(MML.s_tickUnit))/16;	// (quater note)/4
 			m_signalCnt = 0;
-			m_pitchReso = MChannel.DEFAULT_P_RESO;
+			m_pitchReso = MML.DEF_DETUNE_RESO;
 			m_totalMSec = 0;
 			m_chordBegin = 0;
 			m_chordEnd = 0;
@@ -140,9 +140,6 @@
 								break;
 							case MStatus.VOLUME:
 								m_ch.setVolume(e.getVolume());
-								break;
-							case MStatus.EXPRESSION:
-								m_ch.setExpression(e.getExpression());
 								break;
 							case MStatus.PAN:
 								m_ch.setPan(e.getPan());
@@ -517,15 +514,9 @@
 			pushEvent(e);
 		}
 
-		public function recVolume(vol:int):void {
+		public function recVolume(vol:Number):void {
 			var e:MEvent = makeEvent();
 			e.setVolume(vol);
-			pushEvent(e);
-		}
-
-		public function recExpression(ex:int):void {
-			var e:MEvent = makeEvent();
-			e.setExpression(ex);
 			pushEvent(e);
 		}
 

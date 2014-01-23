@@ -10,7 +10,6 @@
 	{
 		protected var m_form:int;
 		protected var m_subform:int;
-		protected var m_volMode:int;
 		protected var m_vmode_max:int;			// 音量値の最大
 		protected var m_vmode_index:int;		// 現在の音量
 		protected var m_vmode_rate:Number;		// 最大音量からの減衰レート（０のとき線形、正のときｄＢ）
@@ -117,12 +116,8 @@
 			for (var i:int = 0; i < m_voiceLen; i++) m_voices[i].setVolMode(max, rate, mode);
 		}
 
-		public function setVolume(vol:int):void {
+		public function setVolume(vol:Number):void {
 			for (var i:int = 0; i < m_voiceLen; i++) m_voices[i].setVolume(vol);
-		}
-
-		public function setExpression(ex:int):void {
-			for (var i:int = 0; i < m_voiceLen; i++) m_voices[i].setExpression(ex);
 		}
 
 		public function setPan(pan:Number):void {
@@ -232,7 +227,6 @@
 			m_form      = 0;
 			m_subform   = 0;
 			m_voiceId   = 0;
-			m_volMode   = 0;
 			for (var i:int = 0; i < m_voiceLen; i++) m_voices[i].reset();
 		}
 

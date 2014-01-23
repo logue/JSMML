@@ -5,13 +5,17 @@
 	import mx.utils.StringUtil;
 
 	public class MML extends EventDispatcher {
-		//●印は、createTrack()の時に初期化が必要
 		public static const DEF_FORM:int = 3;
 		public static const DEF_SUBFORM:int = 0;
+		public static const DEF_DETUNE_RESO:int = 100;
 		public static const DEF_VSMAX:int = 15;
 		public static const DEF_VSRATE:Number = 3.0;
-		public static const DEF_VOL:int = 13;
-		public static const DEF_EXPRS:int = 0;
+		public static const DEF_VOL:Number = 13.0;
+		public static const DEF_VOLOFS:Number = 0.0;
+		public static const DEF_VOLMAGNUM:Number = 1.0;
+		public static const DEF_VOLMAGDNM:Number = 1.0;
+		public static const DEF_VOLCULCPR:int = 0;
+		public static const DEF_VOLROUNDM:int = 0;
 		public static const DEF_MIXVOL:Number = 0.0;
 		public static const DEF_PWMNUM:Number = 4.0;
 		public static const DEF_PWMDNM:Number = 8.0;
@@ -24,8 +28,11 @@
 		public static const DEF_MIN_DELAY_CT:int = 4;
 		public static const DEF_MAX_DELAY_LV:Number = (-0.2);
 		public static const DEF_MIN_DELAY_LV:Number = (-96.0);
+		
 		public static var s_tickUnit:Number = 192.0;
 		public static var s_reportTotalTicks:Boolean;
+		
+		//●印は、createTrack()の時に初期化が必要
 		protected static const MAX_POLYVOICE:int = 64;
 		protected var m_sequencer:MSequencer;
 		protected var m_tracks:Vector.<MTrack>;
@@ -33,25 +40,33 @@
 		protected var m_trackNo:int;
 		protected var m_octave:int;				// ●
 		protected var m_relativeDir:Boolean;	// 相対オクターブ記号向き切り替え
-		protected var m_detune:int;				// ●
-		protected var m_VXscaleMax:int;			// ●Volume/eXpressionスケール管理：最大値
-		protected var m_VXscaleRate:Number;		// ●Volume/eXpressionスケール管理：減衰率（０のとき線形、正数のときdB）
-		protected var m_volume:int;				// ●ボリューム値管理
-		protected var m_volumeDir:int;			// 相対ボリューム記号向き切り替え
-		protected var m_expression:int;			// ●エクスプレッション値管理
-		protected var m_vDir:Boolean;			// 相対volume記号向き切り替え
-		protected var m_length:int;				// default length
+		protected var m_detune:int;				// ●デチューン
+		protected var m_detuneReso:int;			// ●デチューン分解能（半音を何分割するか）
+		protected var m_VscaleMax:int;			// ●Volumeスケール管理：最大値
+		protected var m_VscaleRate:Number;		// ●Volumeスケール管理：減衰率（０のとき線形、正数のときdB）
+		protected var m_volume:Number;			// ●ボリューム値管理
+		protected var m_volumeOffset:Number;	// ●ボリュームオフセット値
+		protected var m_volumeMagNum:Number;	// ●ボリューム倍率値の分子
+		protected var m_volumeMagDenom:Number;	// ●ボリューム倍率値の分母
+		protected var m_volumeCalcPriority:int;	// ●ボリューム計算（オフセットと倍率）の優先順位（0:倍率を先行計算(def), 1:オフセットを先行計算）
+		protected var m_volumeRoundMode:int;	// ●ボリューム計算結果の少数以下の丸めモード（0:丸め無し(def), 1:切り捨て, 2:四捨五入, 3:切り上げ）
+		protected var m_volumeCurrent:Number;	// ●ボリューム計算結果
+		protected var m_vDir:Boolean;			// 相対ボリューム記号向き切り替え
+		protected var m_length:int;				// ●デフォルト音長（tickカウント数）
+		protected var m_lengthDiv:Number;		// ●デフォルト音長（全音符の分割数 for debug disp）
 		protected var m_tempo:Number;
 		protected var m_totalTicks:uint;		// コンパイル時のチェック用Ticksカウンタ
 		protected var m_totalOvFlow:Boolean;	// コンパイル時のチェック用フラグ
-		protected var m_letter:int;
+		protected var m_letter:int;				// 現在のMML解析位置
 		protected var m_keyoff:int;
 		protected var m_form:int;
 		protected var m_subForm:int;
 		protected var m_pwmNum:Number;			// ●pwmの分子
 		protected var m_pwmDenom:Number;		// ●pwmの分母
-		protected var m_gate:int;				// qの分子
+		protected var m_gate:int;				// ●qの分子
 		protected var m_maxGate:int;			// ●qの分母
+		protected var m_gateTicks1:int;			// ●q%のticks
+		protected var m_gateTicks2:int;			// ●@qのticks
 		protected var m_noteShift:int;			// ●
 		protected var m_AEnvLvRdMode:int;		// ●
 		protected var m_AEnvLvDenom:Number;		// ●
@@ -249,7 +264,7 @@
 						evDest  = 1;
 						LvRdMode = m_AEnvLvRdMode;
 						if (m_AEnvLvDenom == 0.0) {
-							LvDenom = Number(m_VXscaleMax);
+							LvDenom = Number(m_VscaleMax);
 						} else {
 							LvDenom = m_AEnvLvDenom;
 						}
@@ -599,8 +614,9 @@
 					o = 0;			//変化単位の指定が無い場合は０。変化単位が０だとMChannel.setPitchResolution()で捨てられる（反映されない）。
 					if (getChar() == ',') {
 						next();
-						o = getUInt(100);
+						o = getUInt(DEF_DETUNE_RESO);
 					}
+					if (o != 0) m_detuneReso = o;				//for debug disp
 					m_tracks[m_trackNo].recDetune(m_detune, o);
 				}
 				else if (getChar() == 'l') {
@@ -831,9 +847,10 @@
 					next();
 				}
 				break;
-			case 'q': // @q: gate time 2 (ticks)
+			case 'q': // @q: gate time 3 (ticks)
 				next();
-				m_tracks[m_trackNo].recGateTicks2(getUInt(0));
+				m_gateTicks2 = getUInt(0);
+				m_tracks[m_trackNo].recGateTicks2(m_gateTicks2);
 				break;
 			case 'u':	// @u: midi風なポルタメント
 				var rate:int;
@@ -1038,34 +1055,116 @@
 			case '@':
 				atmark();
 				break;
+			case '!':
+				i = getUInt(0);			//コメント認識番号
+				m_warning += "!Report (ID:" + i + ") "
+								+ "Track=" + m_trackNo
+								+ ",o=" + m_octave
+								+ ",ns=" + m_noteShift
+								+ ",@d=" + m_detune + "/" + m_detuneReso
+								+ ",l=" + ((Math.round(m_lengthDiv * 1000.0))/1000.0) + "(" + s_tickUnit + "/" + m_length + ")"
+								+ ",q=" + m_gate + "/" + m_maxGate
+								+ ",q%=" + m_gateTicks1
+								+ ",@q=" + m_gateTicks2
+								+ ",v=" + m_volume + "/" + m_VscaleMax
+								+ ",vo=" + m_volumeOffset
+								+ ",vm=" + m_volumeMagNum + "/" + m_volumeMagDenom
+								+ ",vp=" + m_volumeCalcPriority
+								+ ",vr=" + m_volumeRoundMode
+								+ ",NowV=" + m_volumeCurrent
+								+ "\n";
+				break;
 			case 'v': // v..
 				c0 = getChar();
 				if ( chkCharIsNum(c0) == true ) {
 					// Volume
-					m_volume = getUInt(m_volume);
-					if (m_volume > m_VXscaleMax) m_volume = m_VXscaleMax;
-					m_tracks[m_trackNo].recVolume(m_volume);
+					var vval:Number;
+					vval = getUNumber(m_volume);
+					if (checkVolumeValue(vval, m_volumeOffset, m_volumeMagNum, m_volumeMagDenom, true) == 0) {
+						m_volume = vval;
+						culcAndSetVolume();
+					}
+					else {
+						m_warning += "[Track:" + m_trackNo + "] v 指定をスキップします。\n";
+					}
 				}
 				else if (c0 == 's') {
 					// Volume Scale Setting
 					next();
 					i = 0;
-					m_VXscaleMax = getUInt(m_VXscaleMax);
-					if (m_VXscaleMax < 3)   m_VXscaleMax = 3;
-					if (m_VXscaleMax > 1023) m_VXscaleMax = 1023;
+					m_VscaleMax = getUInt(m_VscaleMax);
+					if (m_VscaleMax < 3)    m_VscaleMax = 3;
+					if (m_VscaleMax > 1023) m_VscaleMax = 1023;
 					
 					if (getChar() == ',') {
 						next();
-						m_VXscaleRate = getUNumber(m_VXscaleRate);
-						if (m_VXscaleRate < 0.0)  m_VXscaleRate = 0.0;
-						if (m_VXscaleRate > 24.0) m_VXscaleRate = 24.0;
+						m_VscaleRate = getUNumber(m_VscaleRate);
+						if (m_VscaleRate < 0.0)  m_VscaleRate = 0.0;
+						if (m_VscaleRate > 24.0) m_VscaleRate = 24.0;
 						
 						if (getChar() == ',') {
 							next();
 							i = getUInt(0);		//dBスケール時の、v0の処理モード。省略時は０（v0=無音）
 						}
 					}
-					m_tracks[m_trackNo].recVolMode(m_VXscaleMax, m_VXscaleRate, i);
+					
+					m_volume = Number(m_VscaleMax);		//MChannel内のsetVolMode()で、最大音量でsetVolume()されるため、更新しておく
+					m_volumeMagNum = m_volumeMagDenom;	//強制等倍
+					m_volumeOffset = 0.0;				//強制offset=0
+					m_volumeCurrent = m_volume;			//offsetと倍率による計算結果も強制更新
+					m_tracks[m_trackNo].recVolMode(m_VscaleMax, m_VscaleRate, i);
+				}
+				else if (c0 == 'o') {
+					// Volume Offset
+					var vofsnum:Number;
+					next();
+					vofsnum = getSNumber(m_volumeOffset);
+					if (checkVolumeValue(m_volume, vofsnum, m_volumeMagNum, m_volumeMagDenom, true) == 0) {
+						m_volumeOffset = vofsnum;
+						culcAndSetVolume();
+					}
+					else {
+						m_warning += "[Track:" + m_trackNo + "] vo 指定をスキップします。\n";
+					}
+				}
+				else if (c0 == 'm') {
+					// Volume Magnification
+					var magnum:Number;
+					var magdenom:Number = m_volumeMagDenom;
+					next();
+					magnum = getUNumber(m_volumeMagNum);
+					if (getChar() == ',') {
+						next();
+						magdenom = getUNumber(m_volumeMagDenom);
+					}
+					if (checkVolumeValue(m_volume, m_volumeOffset, magnum, magdenom, true) == 0) {
+						m_volumeMagNum = magnum;
+						m_volumeMagDenom = magdenom;
+						culcAndSetVolume();
+					}
+					else {
+						m_warning += "[Track:" + m_trackNo + "] vm 指定をスキップします。\n";
+					}
+				}
+				else if (c0 == 'p') {
+					// Volume calc.Priority
+					next();
+					i = getUInt(m_volumeCalcPriority);		//0:倍率を先行計算(def), 1:オフセットを先行計算
+					if (i > 1) i = DEF_VOLCULCPR;			//無効モード指定時はデフォルトモードにする
+					if (i != m_volumeCalcPriority) {
+						m_volumeCalcPriority = i;
+						culcAndSetVolume();
+					}
+				}
+				else if (c0 == 'r') {
+					// Volume Round mode
+					next();
+					i = getUInt(m_volumeRoundMode);			//0:丸め無し(def), 1:切り捨て, 2:四捨五入, 3:切り上げ
+					if (i > 3) i = DEF_VOLROUNDM;			//無効モード指定時はデフォルトモードにする
+					if (i != m_volumeRoundMode) {
+						m_volumeRoundMode = i;
+						culcAndSetVolume();
+					}
 				}
 				else {
 					warning("[Track:" + m_trackNo + "] ", MWarning.UNKNOWN_COMMAND, c + c0);
@@ -1074,27 +1173,28 @@
 				break;
 			case '(': // vol up/down
 			case ')':
-				i = 1;
+				var rvval:Number;
+				n = 1.0;
 				if ( chkCharIsNum( getChar() ) == true ) {
-					i = getUInt(1);
+					n = getUNumber(1.0);
 				}
 				if ( ( (c == ')') && (m_vDir == false) ) ||
 					 ( (c == '(') && (m_vDir == true ) )  ) {
 					// up
-					m_volume += i;
-					if (m_volume > m_VXscaleMax) m_volume = m_VXscaleMax;
+					rvval = m_volume + n;
 				}
 				else {
 					// down
-					m_volume -= i;
-					if (m_volume < 0) m_volume = 0;
+					rvval = m_volume - n;
 				}
-				m_tracks[m_trackNo].recVolume(m_volume);
-				break;
-			case 'x':
-				// eXpression
-				m_expression = getSInt(m_expression);
-				m_tracks[m_trackNo].recExpression(m_expression);
+				if (checkVolumeValue(rvval, m_volumeOffset, m_volumeMagNum, m_volumeMagDenom, false) == 0) {
+					m_volume = rvval;
+					culcAndSetVolume();
+				}
+				else {
+					//範囲外指定の場合、相対音量は警告を表示せずに設定スキップ
+					;
+				}
 				break;
 			case 'm':
 				c0 = getChar();
@@ -1118,11 +1218,12 @@
 			case 'l': // Length
 				m_length = len2tick(getUInt(4));
 				m_length = getDot(m_length);
+				m_lengthDiv = (s_tickUnit / Number(m_length));
 				break;
 			case 'q': // Q..
 				c0 = getChar();
 				if ( chkCharIsNum(c0) == true ) {
-					// gate time rate
+					// gate time 1 (rate)
 					i = getUInt(0);						//分子を０とした場合も、省略したとみなす。
 					j = m_maxGate;
 					if (getChar() == ',') {
@@ -1142,9 +1243,10 @@
 					}
 				}
 				else if (c0 == '%') {
-					// gate time 1 (ticks)
+					// gate time 2 (ticks)
 					next();
-					m_tracks[m_trackNo].recGateTicks1(getUInt(0));
+					m_gateTicks1 = getUInt(0);
+					m_tracks[m_trackNo].recGateTicks1(m_gateTicks1);
 				}
 				else {
 					warning("[Track:" + m_trackNo + "] ", MWarning.UNKNOWN_COMMAND, c + c0);
@@ -1233,6 +1335,74 @@
 				//無限リピート有効時のトラック終端オクターブ記録（デバッグ表示用）
 				m_tracks[m_trackNo].m_IRepeatEdOct = m_octave;
 			}
+		}
+
+		protected function checkVolumeValue(v:Number, ofs:Number, nn:Number, nd:Number, f:Boolean):int {
+			var n:Number = 0.0;
+			var result:int = 0;
+			if (m_volumeCalcPriority == 0) {
+				n = (v * (nn / nd)) + ofs;
+			}
+			else {
+				n = (v + ofs) * (nn / nd);
+			}
+			switch (m_volumeRoundMode) {
+			case 1:
+				n = Math.floor(n);
+				break;
+			case 2:
+				n = Math.round(n);
+				break;
+			case 3:
+				n= Math.ceil(n);
+				break;
+			default:
+				break;
+			}
+			if (n > Number(m_VscaleMax)) {
+				result = 1;
+			}
+			else if (n < 0.0) {
+				result = 2;
+			}
+			else {
+				result = 0;
+			}
+			if ((result > 0) && (f == true)) {
+				m_warning += "[Track:" + m_trackNo + "] 音量計算値が制限を超えています。(計算値V=" + n + ",v=" + m_volume + "/" + m_VscaleMax + ",vo=" + ofs + ",vm=" + nn + "/" + nd + ")\n";
+			}
+			return result;
+		}
+		protected function culcAndSetVolume():void {
+			var n:Number;
+			
+			if (m_volumeCalcPriority == 0) {
+				n = (m_volume * (m_volumeMagNum / m_volumeMagDenom)) + m_volumeOffset;
+			}
+			else {
+				n = (m_volume + m_volumeOffset) * (m_volumeMagNum / m_volumeMagDenom);
+			}
+			switch (m_volumeRoundMode) {
+			case 1:
+				n = Math.floor(n);
+				break;
+			case 2:
+				n = Math.round(n);
+				break;
+			case 3:
+				n= Math.ceil(n);
+				break;
+			default:
+				break;
+			}
+			if (n > Number(m_VscaleMax)) {
+				n = Number(m_VscaleMax);
+			}
+			else if (n < 0.0) {
+				n = 0.0;
+			}
+			m_volumeCurrent = n;
+			m_tracks[m_trackNo].recVolume(m_volumeCurrent);
 		}
 
 		protected function getCharNext():String {
@@ -1361,25 +1531,36 @@
 			m_totalOvFlow = false;
 			m_keyoff = 1;
 			m_length = len2tick(4);
+			m_lengthDiv = 4.0;
 			m_form = DEF_FORM;
 			m_subForm = DEF_SUBFORM;
 			m_gate = 16;
 			m_maxGate = 16;
+			m_gateTicks1 = 0;
+			m_gateTicks2 = 0;
+			
 			m_pwmNum   = DEF_PWMNUM;
 			m_pwmDenom = DEF_PWMDNM;
 			m_noiseModDest = DEF_NZMOD;
 			m_delayCountMax = 0;		//ディレイエフェクトの最大サンプル数。０でディレイ無効。
-
+			
 			m_octave = 4;
 			m_noteShift = 0;
+			m_detune = 0;
+			m_detuneReso = DEF_DETUNE_RESO;
 			m_beforeNote = 0;
 			m_portamento = 0;
-
-			m_VXscaleMax = DEF_VSMAX;
-			m_VXscaleRate = DEF_VSRATE;
+			
+			m_VscaleMax = DEF_VSMAX;
+			m_VscaleRate = DEF_VSRATE;
 			m_volume = DEF_VOL;
-			m_expression = DEF_EXPRS;
-
+			m_volumeCurrent = DEF_VOL;
+			m_volumeOffset = DEF_VOLOFS;
+			m_volumeMagNum = DEF_VOLMAGNUM;
+			m_volumeMagDenom = DEF_VOLMAGDNM;
+			m_volumeCalcPriority = DEF_VOLCULCPR;
+			m_volumeRoundMode = DEF_VOLROUNDM;
+			
 			m_AEnvLvRdMode = 0;			//音量ENVレベルの丸めモード。0 は滑らかモード。
 			m_AEnvLvDenom = 0.0;		//音量ENVレベルの分母指定。0.0 は特例で分母にm_VXscaleMaxを採用するモード。
 			m_AEnvLvOffset = 0.0;		//音量ENVレベルへのオフセット。

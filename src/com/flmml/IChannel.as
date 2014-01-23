@@ -13,8 +13,7 @@
 		function setLfoResolution(spt:Number):void;
 		function setMixingVolume(m_vol:Number):void;
 		function setVolMode(max:int, rate:Number, mode:int):void;
-		function setVolume(vol:int):void;
-		function setExpression(ex:int):void;
+		function setVolume(vol:Number):void;
 		function setPan(pan:Number):void;
 		function setPanLegacy(lgPan:int):void;
 		function setForm(form:int, sub:int):void;
