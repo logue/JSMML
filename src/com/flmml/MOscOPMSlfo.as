@@ -13,6 +13,7 @@ package com.flmml {
 		private static var N_CH:int = 8;
 		private static const PMSMUL:Vector.<int> = Vector.<int>([ 0,1,2,4,8,16,32,32 ]);
 		private static const PMSSHL:Vector.<int> = Vector.<int>([ 0,0,0,0,0, 0, 1, 2 ]);
+		private static const AMSADJ:int = (7 - (MOscOPMSop.SIZEALPHATBL_BITS - 10));	//元々10bitからのSIZEALPHATBL_BITS拡張分を補正
 		private static var PmTbl0:Vector.<int>;
 		private static var PmTbl2:Vector.<int>;
 		private static var AmTbl0:Vector.<int>;
@@ -265,7 +266,7 @@ package com.flmml {
 			}
 		}
 		public function CulcAmValue():void {
-			AmValue = (((AmTblValue*Amd)>>(7-4))<<Ams)&(int(0x7FFFFFFF));		//7-4の-4はPRECISION_BITSの拡張分
+			AmValue = (((AmTblValue*Amd)>>(AMSADJ))<<Ams)&(int(0x7FFFFFFF));		//7-xの-xはSIZEALPHATBL_BITSの拡張分
 		}
 		public function CulcAllPmValue():void {
 			//単チャネルモデルの為

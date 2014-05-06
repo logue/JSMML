@@ -185,7 +185,7 @@
 		}
 		public function resetParam():void {
 			m_voiceid = 0.0;
-			setFormExec(MML.DEF_FORM, MML.DEF_SUBFORM);
+			setFormDirect(MML.DEF_FORM, MML.DEF_SUBFORM);
 			setPWM(0.5, 0);
 			setDetune(0, MML.DEF_DETUNE_RESO);
 			m_envForceTrigger = 0;
@@ -432,9 +432,11 @@
 			}
 		}
 		public function setForm(form:int, sub:int):void {
-			m_formNo  = form;
-			m_subfNo  = sub;
-			m_formReq = true;
+			if ((form >= 0) && (form < MOscillator.MAX)) {
+				m_formNo  = form;
+				m_subfNo  = sub;
+				m_formReq = true;
+			}
 		}
 		public function setSubForm(subform:int):void {
 			m_subfNo  = subform;
@@ -445,35 +447,28 @@
 			m_phaseRMphase = phase;
 			m_phaseRMReq = true;
 		}
-		public function setFormOnNote():void {
+		private function setFormOnNote():void {
 			if (m_formReq == true) {
-				setFormExec(m_formNo, m_subfNo);
+				m_oscMod1 = m_oscSet1.setForm(m_formNo);
+				m_oscMod1.setWaveNo(m_subfNo);
 				m_formReq = false;
 			}
 		}
-		public function setSubFormOnNote():void {
+		private function setSubFormOnNote():void {
 			if (m_subfReq == true) {
-				setSubFormExec(m_subfNo);
+				m_oscMod1.setWaveNo(m_subfNo);
 				m_subfReq = false;
 			}
 		}
-		public function setPhaseRModeOnNote():void {
+		private function setPhaseRModeOnNote():void {
 			if (m_phaseRMReq == true) {
-				setPhaseRModeExec(m_phaseRMmode, m_phaseRMphase);
+				m_oscMod1.setPhaseResetMode(m_phaseRMmode, m_phaseRMphase);
 				m_phaseRMReq = false;
 			}
 		}
-		public function setFormExec(form:int, sub:int):void {
+		private function setFormDirect(form:int, sub:int):void {
 			m_oscMod1 = m_oscSet1.setForm(form);
 			m_oscMod1.setWaveNo(sub);
-		}
-		public function setSubFormExec(subform:int):void {
-			var mod:MOscMod = m_oscSet1.getCurrent();
-			mod.setWaveNo(subform);
-		}
-		public function setPhaseRModeExec(mode:int, phase:Number):void {
-			var mod:MOscMod = m_oscSet1.getCurrent();
-			mod.setPhaseResetMode(mode, phase);
 		}
 		public function setEnvelope(dest:int, lvRd_mode:int, atk_mode:Boolean, initlevel:Number, evPoints:Array):void {
 			var i:int;

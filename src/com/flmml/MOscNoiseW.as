@@ -94,7 +94,7 @@
 				break;
 			case 4:		//func.4: reserved
 				break;
-			case 5:		//func.5: setNoiseFreq() [MML.as:@nで使用]
+			case 5:		//sp.func.5: setNoiseFreq() [MML.as:@nで使用]
 				setNoiseFreq(n);
 				break;
 			}

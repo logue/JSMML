@@ -9,15 +9,17 @@ package com.flmml {
 		private var m_id:int;
 		private static var s_init:int = 0;
 		
-		private static const PRECISION_BITS:int    = (14);
-		private static const PRECISION:int         = (1<<PRECISION_BITS);
-		private static const SIZEALPHATBL_BITS:int = (14);
+		public  static const SIZEALPHATBL_BITS:int = (15);
 		private static const SIZEALPHATBL:int      = (1<<SIZEALPHATBL_BITS);
 		private static const ALPHAZERO:int         = (SIZEALPHATBL*3);
-		private static const SIZESINTBL_BITS:int   = (15);
+		private static const EL2DL:int             = (SIZEALPHATBL_BITS - 6);
+		private static const ELMIN:int             = (SIZEALPHATBL);
+		private static const ELATROUND:int         = int( Math.pow(2.0, Number(SIZEALPHATBL_BITS - 10)) );
+		
+		public  static const SIZESINTBL_BITS:int   = (17);
 		private static const SIZESINTBL:int        = (1<<SIZESINTBL_BITS);
-		private static const MAXSINVAL:int         = ((1<<(SIZESINTBL_BITS+2)) - 1);
-		private static const MASKPHASE:int         = ((1<<(PRECISION_BITS + SIZESINTBL_BITS)) - 1);
+		private static const MAXSINVAL:Number      = Number((1<<(SIZESINTBL_BITS+2)) - 1);
+		private static const MASKPHASE:Number      = Number(SIZESINTBL);
 		
 		private static const KEYON:int       = (-1);
 		private static const ATACK:int       = 0;
@@ -35,13 +37,13 @@ package com.flmml {
 			ATACK, SUSTAIN_MAX, SUSTAIN_MAX, SUSTAIN_MAX, RELEASE_MAX, RELEASE_MAX,
 		]);
 		
-		private static var ALPHATBL:Vector.<int>;
+		private static var ALPHATBL:Vector.<Number>;
 		
-		private static var SINTBL:Vector.<int>;
+		private static var SINTBL:Vector.<Number>;
 		
 		private static var STEPTBL:Vector.<Number>;	//oct(-2..+13),note(c+..>c),kf(0..63) -> 16*12*64=12288個
 		
-		private static var DT1TBL:Vector.<int>;		//int DT1TBL[128+4];
+		private static var DT1TBL:Vector.<Number>;	//DT1TBL[128];
 		private static var DT1TBL_org:Vector.<int> = Vector.<int>([
 			0, 0, 1, 2, 
 			0, 0, 1, 2, 
@@ -75,8 +77,6 @@ package com.flmml {
 			0, 8, 16, 22, 
 			0, 8, 16, 22, 
 			0, 8, 16, 22, 
-			
-			0, 8, 16, 22, 
 		]);
 		
 		private static var DT2TBL:Vector.<int> = Vector.<int>([
@@ -86,14 +86,14 @@ package com.flmml {
 		private static var D1LTBL:Vector.<int>;		//[16];
 		
 		private static var XRTBL_and:Vector.<int> = Vector.<int>([		//[64]
-			255,
-			127, 127, 127, 127,
+			127,
 			63,  63,  63,  63,
 			31,  31,  31,  31,
 			15,  15,  15,  15,
 			7,   7,   7,   7,
 			3,   3,   3,   3,
 			1,   1,   1,   1,
+			0,   0,   0,   0,
 			0,   0,   0,   0,
 			0,   0,   0,   0,
 			0,   0,   0,   0,
@@ -113,39 +113,37 @@ package com.flmml {
 			5,   6,   7,   8,
 			5,   6,   7,   8,
 			5,   6,   7,   8,
-			5,   6,   7,   8,
 			10,  12,  14,  16,
 			20,  24,  28,  32,
 			40,  48,  56,  64,
-			120, 144, 168, 192,
-			240, 288, 336, 384,
-			480, 576, 672, 768,
-			960, 1152,1344,1536,
-			1536,1536,1536,
+			80,  96,  112, 128,
+			160, 192, 224, 256,
+			320, 384, 448, 512,
+			640, 768, 896, 1024,
+			1280,1536,1792,2048,
+			2048,2048,2048,
 		]);
 		
 		// フェーズジェネレータ関係
-		public  var inp:int;		// FM変調の入力
+		public  var inp:Number;		// FM変調の入力
 		
 		private var LfoPitch:int;	// 前回のlfopitch値, CULC_DELTA_T値の時はDeltaTを再計算する。
 		private var T:Number;		// 現在時間 (0 <= T < SIZESINTBL*PRECISION)
 		private var DeltaT:Number;	// Δt
 		private var Ame:int;		// 0(トレモロをかけない), -1(トレモロをかける)
 		private var LfoLevel:int;	// 前回のlfopitch&Ame値, CULC_ALPHA値の時はAlphaを再計算する。
-		private var Alpha:int;		// 最終的なエンベロープ出力値
+		private var Alpha:Number;	// 最終的なエンベロープ出力値
 		
-		public  var out:int;		// オペレータの出力先
+		public  var out:Number;		// オペレータの出力先
 		
-		private var Pitch:int;		// 0<=pitch<10*12*64
-		private var Dt1Pitch:int;	// Step に対する補正量
-		private var Mul:int;		// 0.5*2 1*2 2*2 3*2 ... 15*2
-		private var Tl:int;			// (128-TL)*8
+		private var Pitch:int;			// 0<=pitch<10*12*64
+		private var Dt1Pitch:Number;	// Step に対する補正量
+		private var Mul:Number;			// 0.5, 1, 2, 3, .., 15
+		private var Tl:int;				// (128 - (n & 127)) << (SIZEALPHATBL_BITS - 7)
 		
-		private var Out2Fb:int;		// フィードバックへの出力値
-		private var Inp_last:int;	// 最後の入力値
-		private var Fl:int;			// フィードバックレベルのシフト値(31,7,6,5,4,3,2,1)
-		private var Fl_mask:int;	// フィードバックのマスク(0,-1)
-		private var ArTime:int;		// AR専用 t
+		private var Out2Fb:Number;		// フィードバックへの出力値
+		private var Inp_last:Number;	// 最後の入力値
+		private var Fl:Number;			// フィードバックレベルのシフト値(31,7,6,5,4,3,2,1)
 		
 		// エンベロープ関係
 		private var Xr_stat:int;
@@ -175,8 +173,8 @@ package com.flmml {
 		private var StatTbl_add:Vector.<int>;
 		private var StatTbl_limit:Vector.<int>;
 		//           ATACK     DECAY   SUSTAIN     SUSTAIN_MAX RELEASE     RELEASE_MAX
-		// and     :                               257                     257
-		// cmp     :                               128                     128
+		// and     :                               129                     129
+		// cmp     :                               64                      64
 		// add     :                               0                       0
 		// limit   : 0         D1l     63          63          63          63
 		// nextstat: DECAY     SUSTAIN SUSTAIN_MAX SUSTAIN_MAX RELEASE_MAX RELEASE_MAX
@@ -200,34 +198,21 @@ package com.flmml {
 		public static function MakeTable():void {
 			var i:int;
 			// sinテーブルを作成
-			SINTBL = new Vector.<int>(SIZESINTBL+1);
+			SINTBL = new Vector.<Number>(SIZESINTBL+1);
 			for (i=0; i<=SIZESINTBL; ++i) {
 				SINTBL[i] =
-					int(
-						Math.round(
-							Math.sin(2.0 * Math.PI * Number(i) / Number(SIZESINTBL))
-							*Number(MAXSINVAL)
-						)
-					);
+					Math.sin(2.0 * Math.PI * Number(i) / Number(SIZESINTBL))  *  MAXSINVAL;
 			}
 			// エンベロープ値 → α 変換テーブルを作成
-			ALPHATBL = new Vector.<int>(ALPHAZERO+SIZEALPHATBL+1);
+			ALPHATBL = new Vector.<Number>(ALPHAZERO+SIZEALPHATBL+1);
 			for (i=0; i<=ALPHAZERO+SIZEALPHATBL; ++i) {
-				ALPHATBL[i] = 0;
+				ALPHATBL[i] = 0.0;
 			}
-			for (i=17; i<=SIZEALPHATBL; ++i) {
+			for (i=(SIZEALPHATBL/128); i<=SIZEALPHATBL; ++i) {
 				ALPHATBL[ALPHAZERO+i] =
-					int(
-						Math.floor(
-							Math.pow(2.0, (-1.0 * (Number(SIZEALPHATBL - i))) * (128.0/8.0) / Number(SIZEALPHATBL) )
-							* 1.0
-							* 1.0
-							* Number(PRECISION)
-							+ 0.0
-						)
-					);
+					Math.pow(2.0, (-1.0 * (Number(SIZEALPHATBL - i))) * (128.0/8.0) / Number(SIZEALPHATBL) );
 			}
-			// D1L → D1l 変換テーブルを作成
+			// D1L変換テーブルを作成
 			D1LTBL = new Vector.<int>(16);
 			for (i=0; i<15; ++i) {
 				D1LTBL[i] = i*2;
@@ -236,40 +221,31 @@ package com.flmml {
 			
 			// Pitch→Δt変換テーブルを作成
 			var	oct:int;
-			var octofs:int = (SIZESINTBL_BITS - 13) + (PRECISION_BITS - 10);
-			var dtofs:Number = Math.pow(2.0, Number(SIZESINTBL_BITS - 10 + PRECISION_BITS - 10));
+			var octofs:int = (-5);
 			var	notekf:int;
-			var	step:Number;
-			var fnb:Number = 1048576.0;					// 2^20
-			var clk:Number = MOscOPMS.s_OpmRateN;		// MasterClock / 64
-			var rate:Number = (64.0 * MOscOPMS.s_OpmRateN) / Number(MOscOPMS.s_Samprate);
+			var sinsize:Number = Number(SIZESINTBL);
+			var fSAM:Number = Number(MOscOPMS.s_Samprate);
 			STEPTBL = new Vector.<Number>(16*12*64);
-			DT1TBL  = new Vector.<int>(128+4);
 			for (oct=(-2); oct<=13; ++oct) {
 				// オクターブごとに c+ から >c までの 64分割スケール のΔtテーブルを作成
 				for (notekf=0; notekf<12*64; ++notekf) {
 					STEPTBL[(oct+2)*12*64+notekf] = 
-						Math.round(
-							(
-								(
-									(
-									440.0
-									* Math.pow( 2.0, (Number(oct) + Number(octofs)) )				//2^(oct - 3)
-									* Math.pow( 2.0, ((Number(notekf) - (8.0*64.0)) / 768.0) )		//c+からスタート
-									)
-								* fnb / clk
-								)
-								/ 4.0
-							)
-							* rate
+						(
+							440.0
+							* Math.pow( 2.0, Number(oct + octofs) )
+							* Math.pow( 2.0, ((Number(notekf) - (8.0*64.0)) / 768.0) )		//c+からスタート
 						)
-					;
+						* sinsize / fSAM
+						;
 					//trace("step", (oct+2)*12*64+notekf,"=",STEPTBL[(oct+2)*12*64+notekf]);
 				}
 			}
-			for (i=0; i<=128+4-1; ++i) {
-				//DT1TBL[i] = int( Number(DT1TBL_org[i]) * 64.0 * (Number(MOscOPMS.s_OpmRate)/Number(MOscOPMS.s_Samprate)) );
-				DT1TBL[i] = int( Math.round(Number(DT1TBL_org[i]) * rate * dtofs) );
+			//DT1テーブル作成
+			var dfs:Number = MOscOPMS.s_OpmRateN / Number(MOscOPMS.s_Samprate);
+			var dtofs:Number = Math.pow(2.0, Number(SIZESINTBL_BITS - 20) ) * dfs;
+			DT1TBL  = new Vector.<Number>(128);
+			for (i=0; i<128; ++i) {
+				DT1TBL[i] = (Number(DT1TBL_org[i])) * dtofs;
 			}
 		}
 		
@@ -287,21 +263,19 @@ package com.flmml {
 			Dt2 = 0;
 			Dt1 = 0;
 			
-			ArTime = 0;
-			Fl = 31;
-			Fl_mask = 0;
-			Out2Fb = 0;
-			inp = 0;
-			Inp_last = 0;
+			Fl = 0.0;
+			Out2Fb = 0.0;
+			inp = 0.0;
+			Inp_last = 0.0;
 			DeltaT = 0.0;
 			LfoPitch = CULC_DELTA_T;
 			T = 0.0;
 			LfoLevel = CULC_ALPHA;
-			Alpha = 0;
-			Tl = (128-127)<<7;
-			Xr_el = 16384;
+			Alpha = 0.0;
+			Tl = (128-127) << (SIZEALPHATBL_BITS - 7);
+			Xr_el = ELMIN;
 			Xr_step = 0;
-			Mul = 2;
+			Mul = 1.0;
 			Ame = 0;
 			
 			AI = (-1);
@@ -313,12 +287,12 @@ package com.flmml {
 			StatTbl_limit[RELEASE] = 63;
 			StatTbl_limit[RELEASE_MAX] = 63;
 			
-			StatTbl_and[SUSTAIN_MAX] = 257;
-			StatTbl_cmp[SUSTAIN_MAX] = 128;
+			StatTbl_and[SUSTAIN_MAX] = 129;
+			StatTbl_cmp[SUSTAIN_MAX] = 64;
 			StatTbl_add[SUSTAIN_MAX] = 0;
 			
-			StatTbl_and[RELEASE_MAX] = 257;
-			StatTbl_cmp[RELEASE_MAX] = 128;
+			StatTbl_and[RELEASE_MAX] = 129;
+			StatTbl_cmp[RELEASE_MAX] = 64;
 			StatTbl_add[RELEASE_MAX] = 0;
 			
 			Xr_stat = RELEASE_MAX;
@@ -355,11 +329,11 @@ package com.flmml {
 				if (ks < 62) {
 					StatTbl_add[ATACK] = XRTBL_add[ks];
 				} else {
-					StatTbl_add[ATACK] = 3072;
+					StatTbl_add[ATACK] = 4096;
 				}
 			} else {
-				StatTbl_and[ATACK] = 257;
-				StatTbl_cmp[ATACK] = 128;
+				StatTbl_and[ATACK] = 129;
+				StatTbl_cmp[ATACK] = 64;
 				StatTbl_add[ATACK] = 0;
 			}
 			if (Xr_stat == ATACK) {
@@ -377,8 +351,8 @@ package com.flmml {
 				StatTbl_cmp[DECAY] = XRTBL_and[ks]>>1;
 				StatTbl_add[DECAY] = XRTBL_add[ks];
 			} else {
-				StatTbl_and[DECAY] = 257;
-				StatTbl_cmp[DECAY] = 128;
+				StatTbl_and[DECAY] = 129;
+				StatTbl_cmp[DECAY] = 64;
 				StatTbl_add[DECAY] = 0;
 			}
 			if (Xr_stat == DECAY) {
@@ -396,8 +370,8 @@ package com.flmml {
 				StatTbl_cmp[SUSTAIN] = XRTBL_and[ks]>>1;
 				StatTbl_add[SUSTAIN] = XRTBL_add[ks];
 			} else {
-				StatTbl_and[SUSTAIN] = 257;
-				StatTbl_cmp[SUSTAIN] = 128;
+				StatTbl_and[SUSTAIN] = 129;
+				StatTbl_cmp[SUSTAIN] = 64;
 				StatTbl_add[SUSTAIN] = 0;
 			}
 			if (Xr_stat == SUSTAIN) {
@@ -427,18 +401,16 @@ package com.flmml {
 		public function CulcDt1Pitch():void {
 			Dt1Pitch = DT1TBL[(Kc & 0xFC)+(Dt1 & 3)];
 			if ((Dt1 & 0x04) != 0) {
-				Dt1Pitch = -Dt1Pitch;
+				Dt1Pitch = Dt1Pitch * (-1.0);
 			}
 		}
 		
-		public function SetFL(n:int):void {
-			n = n & 7;
-			if (n == 0) {
-				Fl = 31;
-				Fl_mask = 0;
+		public function SetFL(n:Number):void {
+			if (n <= 0.0 || n > 8.0) {
+				Fl = 0.0;
 			} else {
-				Fl = (7-n+1+1);
-				Fl_mask = -1;
+				//7->2^(-2), 6->2^(-3), 5->2^(-4), 4->2^(-5), 3->2^(-6), 2->2^(-7), 1->2^(-8), 0->0
+				Fl = Math.pow(2.0, Number(n - 9.0));
 			}
 		}
 		
@@ -457,44 +429,27 @@ package com.flmml {
 			CulcRrStep();
 		}
 		
-		// 旧キーコード設定（未使用）
-		public function SetKC(n:int):void {
-			Kc = n & 127;
-			var note:int = Kc & 15;
-			Note = (((Kc>>4)+1)*12) + note - (note>>2);
-			++Kc;
-			CulcPitch();
-			CulcDt1Pitch();
-			LfoPitch = CULC_DELTA_T;
-			CulcArStep();
-			CulcD1rStep();
-			CulcD2rStep();
-			CulcRrStep();
-		}
-		
-		// 旧キーフラクション設定（未使用）
-		public function SetKF(n:int):void {
-			Kf = n & 63;
-			CulcPitch();
-			LfoPitch = CULC_DELTA_T;
-		}
-		
 		public function SetDT1(n:int):void {
 			Dt1 = n & 7;
 			CulcDt1Pitch();
 			LfoPitch = CULC_DELTA_T;
 		}
 		
-		public function SetMUL(n:int):void {
-			Mul = (n & 15) << 1;
-			if (Mul == 0) {
-				Mul = 1;
+		public function SetMUL(n:Number):void {
+			if (n <= 0.0) {
+				Mul = 0.5;
+			}
+			else if (n > 16.0) {
+				Mul = 16.0;
+			}
+			else {
+				Mul = n;
 			}
 			LfoPitch = CULC_DELTA_T;
 		}
 		
 		public function SetTL(n:int):void {
-			Tl = (128 - (n & 127)) << 7;
+			Tl = (128 - (n & 127)) << (SIZEALPHATBL_BITS - 7);
 			LfoLevel = CULC_ALPHA;
 		}
 		
@@ -551,7 +506,7 @@ package com.flmml {
 			if (i <   0) i = (-1);
 			if (i > 128) i =  128;
 			if (i >= 0) {
-				AI = (i << 7);
+				AI = i << (SIZEALPHATBL_BITS - 7);
 			}
 			else {
 				AI = i;
@@ -559,16 +514,18 @@ package com.flmml {
 		}
 		
 		public function ResetFBbuf():void {
-			Inp_last = 0;
+			Out2Fb = 0.0;
+			Inp_last = 0.0;
 		}
 		
 		public function ResetPhase(phase:Number):void {
-			//T = int(phase * Number(MASKPHASE));
-			T = Math.round(phase * Number(MASKPHASE));
+			T = phase * MASKPHASE;
+			RefreshPhase();
+			ResetFBbuf();
 		}
 		
-		public function RefreshPhase(phase:Number):void {
-			T = T % Number(MASKPHASE + 1);				//繰り上がり部分のみ対処
+		public function RefreshPhase():void {
+			T = T % MASKPHASE;				//繰り上がり部分のみ対処
 		}
 		
 		public function KeyON():void {
@@ -586,7 +543,7 @@ package com.flmml {
 					Xr_cmp = StatTbl_cmp[Xr_stat];
 					Xr_add = StatTbl_add[Xr_stat];
 					Xr_limit = StatTbl_limit[Xr_stat];
-					if ((Xr_el>>8) == Xr_limit) {
+					if ((Xr_el>>EL2DL) == Xr_limit) {
 						Xr_stat = NEXTSTAT[Xr_stat];
 						Xr_and = StatTbl_and[Xr_stat];
 						Xr_cmp = StatTbl_cmp[Xr_stat];
@@ -609,8 +566,8 @@ package com.flmml {
 			Xr_cmp = StatTbl_cmp[Xr_stat];
 			Xr_add = StatTbl_add[Xr_stat];
 			Xr_limit = StatTbl_limit[Xr_stat];
-			if ((Xr_el>>8) >= 63) {
-				Xr_el = 16384;
+			if ((Xr_el>>EL2DL) >= 63) {
+				Xr_el = ELMIN;
 				Xr_stat = MAXSTAT[Xr_stat];
 				Xr_and = StatTbl_and[Xr_stat];
 				Xr_cmp = StatTbl_cmp[Xr_stat];
@@ -625,18 +582,18 @@ package com.flmml {
 				if (Xr_stat == ATACK) {
 					// ATACK
 					Xr_step += Xr_add;
-					Xr_el += (((~Xr_el)*(Xr_step>>3)) >> 8);
+					Xr_el += (((~Xr_el)*(Xr_step>>3)) >> EL2DL);
 					LfoLevel = CULC_ALPHA;
 					Xr_step &= 7;
 					
-					if (Xr_el <= 0) {
+					if (Xr_el < ELATROUND) {
 						Xr_el = 0;
 						Xr_stat = DECAY;
 						Xr_and = StatTbl_and[Xr_stat];
 						Xr_cmp = StatTbl_cmp[Xr_stat];
 						Xr_add = StatTbl_add[Xr_stat];
 						Xr_limit = StatTbl_limit[Xr_stat];
-						if ((Xr_el>>8) == Xr_limit) {
+						if ((Xr_el>>EL2DL) == Xr_limit) {
 							Xr_stat = NEXTSTAT[Xr_stat];
 							Xr_and = StatTbl_and[Xr_stat];
 							Xr_cmp = StatTbl_cmp[Xr_stat];
@@ -652,9 +609,9 @@ package com.flmml {
 					LfoLevel = CULC_ALPHA;
 					Xr_step &= 7;
 					
-					var e:int = (Xr_el>>8);
+					var e:int = (Xr_el>>EL2DL);
 					if (e == 63) {
-						Xr_el = 16384;
+						Xr_el = ELMIN;
 						Xr_stat = MAXSTAT[Xr_stat];
 						Xr_and = StatTbl_and[Xr_stat];
 						Xr_cmp = StatTbl_cmp[Xr_stat];
@@ -677,7 +634,7 @@ package com.flmml {
 				//DeltaT = ((STEPTBL[Pitch+lfopitch]+Dt1Pitch)*Mul)>>1;
 				//DeltaT = ((STEPTBL[Pitch+lfopitch]+Dt1Pitch)*Mul)>>(6+1);
 				//Pitch+lfopitchの範囲制限はテーブル領域の拡大にて代用（要テーブルサイズ確認）
-				DeltaT = ( (STEPTBL[Pitch+lfopitch] + Number(Dt1Pitch)) * Number(Mul) ) / 128;
+				DeltaT = ( (STEPTBL[Pitch+lfopitch] + Dt1Pitch) * Mul );
 				LfoPitch = lfopitch;
 			}
 			//T = (T + DeltaT) & MASKPHASE;
@@ -685,29 +642,30 @@ package com.flmml {
 			
 			var lfolevelame:int = lfolevel & Ame;
 			if (LfoLevel != lfolevelame) {
-				Alpha = ALPHATBL[ALPHAZERO+Tl-Xr_el-lfolevelame];
+				Alpha = ALPHATBL[ALPHAZERO + Tl - int(Xr_el) - lfolevelame];
 				LfoLevel = lfolevelame;
 			}
 			//var o:int = (Alpha) * SINTBL[(((T+Out2Fb+inp)>>PRECISION_BITS))&(SIZESINTBL-1)];
 			var p:Number;
-			var o:int;
-			p = T + Number(Out2Fb) + Number(inp);
+			var o:Number;
+			p = T + Out2Fb + inp;
 			if (p >= 0) {
-				p = (p / Number(PRECISION)) % Number(SIZESINTBL);
+				p = p % MASKPHASE;
 			}
 			else {
-				p = (p / Number(PRECISION)) % Number(SIZESINTBL);		//ここでのpは負数で得られる
-				p = Number(SIZESINTBL) + p;
+				p = p % MASKPHASE;				//ここでのpは負数で得られる
+				p = MASKPHASE + p;
 			}
 			o = (Alpha) * SINTBL[int(p)];
 			
 			
 			//	var o2:int = (o+Inp_last) >> 1;
 			//	Out2Fb = (o+o) >> Fl;
-			Out2Fb = ((o + Inp_last) & Fl_mask) >> Fl;
+			Out2Fb = (o + Inp_last) * Fl;
 			Inp_last = o;
 			
 			out = o;
+			
 		}
 		
 		public function isPlaying():Boolean {

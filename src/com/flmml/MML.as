@@ -1442,7 +1442,7 @@
 		protected function getUInt(def:int):int {
 			var ret:int = 0;
 			var l:int = m_letter;
-			var f:int = 1;
+			var f:Boolean = true;
 			while(f) {
 				var c:String = getChar();
 				switch(c) {
@@ -1456,37 +1456,40 @@
 				case '7': ret = (ret * 10) + 7; next(); break;
 				case '8': ret = (ret * 10) + 8; next(); break;
 				case '9': ret = (ret * 10) + 9; next(); break;
-				default: f = 0; break;
+				default: f = false; break;
 				}
 			}
 			return (m_letter == l) ? def : ret;
 		}
 
 		protected function getUNumber(def:Number):Number {
-			var ret:Number = Number( getUInt(int(def)) );
-			var l:Number = 1;
+			var ret:Number;
+			var l:int;
+			var d:Number = 1.0;
+			l = m_letter;
+			ret = Number( getUInt(0) );
 			if (getChar() == '.') {
 				next();
 				var f:Boolean = true;
 				while(f) {
 					var c:String = getChar();
-					l *= (0.1);
+					d *= (0.1);
 					switch(c) {
-						case '0': ret = ret + (0.0 * l); next(); break;
-						case '1': ret = ret + (1.0 * l); next(); break;
-						case '2': ret = ret + (2.0 * l); next(); break;
-						case '3': ret = ret + (3.0 * l); next(); break;
-						case '4': ret = ret + (4.0 * l); next(); break;
-						case '5': ret = ret + (5.0 * l); next(); break;
-						case '6': ret = ret + (6.0 * l); next(); break;
-						case '7': ret = ret + (7.0 * l); next(); break;
-						case '8': ret = ret + (8.0 * l); next(); break;
-						case '9': ret = ret + (9.0 * l); next(); break;
+						case '0': ret = ret + (0.0 * d); next(); break;
+						case '1': ret = ret + (1.0 * d); next(); break;
+						case '2': ret = ret + (2.0 * d); next(); break;
+						case '3': ret = ret + (3.0 * d); next(); break;
+						case '4': ret = ret + (4.0 * d); next(); break;
+						case '5': ret = ret + (5.0 * d); next(); break;
+						case '6': ret = ret + (6.0 * d); next(); break;
+						case '7': ret = ret + (7.0 * d); next(); break;
+						case '8': ret = ret + (8.0 * d); next(); break;
+						case '9': ret = ret + (9.0 * d); next(); break;
 						default: f = false; break;
 					}
 				}
 			}
-			return ret;
+			return (m_letter == l) ? def : ret;
 		}
 
 		protected function getSInt(def:int):int {
@@ -1833,13 +1836,10 @@
 					s = s.replace(/\s+/gm, "");
 					if (s.length > 0) {
 						i = int(s);
-						switch(i) {
-						case 2:
-						case 4:
-						case 8:
+						if ((i >= 1) && (i <= 10)) {
 							MOscWaveMem.s_OverSmpMultiple = Number(i);
-							break;
-						default:
+						}
+						else {
 							i = (-1);
 						}
 					}
@@ -1847,7 +1847,7 @@
 						i = (-1);
 					}
 					if (i < 0) {
-						m_warning += "#MULOVSWMの設定が規定（2 / 4 / 8）外のため、既定 4 から変更しません。(" + s + ")\n";
+						m_warning += "#MULOVSWMの設定が規定（1〜10）範囲外のため、既定 4 から変更しません。(" + s + ")\n";
 					}
 				}
 			}
@@ -2217,7 +2217,9 @@
 				var fmm:Array;
 				for (i = 0; i < matched.length; i++) {
 					fmm = matched[i].match(/^#FM@[ \t]*(\d+)\s*{([^}]*)}/m);
-					MOscOPMS.loadToneOPM(int(fmm[1]), fmm[2]);
+					if (MOscOPMS.loadToneOPM(int(fmm[1]), fmm[2]) != 0) {
+						m_warning += "#FM@" + int(fmm[1]) + " の設定に失敗しました。\n";
+					}
 				}
 				fmm = null;
 				
@@ -2228,11 +2230,14 @@
 				var fms:Array;
 				for (i = 0; i < matched.length; i++) {
 					fms = matched[i].match(/^#FMS@[ \t]*(\d+)\s*{([^}]*)}/m);
-					MOscOPMS.loadToneOPMS(int(fms[1]), fms[2]);
+					if (MOscOPMS.loadToneOPMS(int(fms[1]), fms[2]) != 0) {
+						m_warning += "#FMS@" + int(fms[1]) + " の設定に失敗しました。\n";
+					}
 				}
 				fms = null;
 			}
 
+			//                                       No/CharW/bitW
 			// WAVE MEMORY(SINGLE CYCLE) (ex. "#WAVEM 0,1,4,0123456789abcdeffedcba9876543210")
 			{
 				var wav:Array;
@@ -2269,6 +2274,7 @@
 				}
 			}
 
+			//                      No/initV/Loop/DecMode
 			// DPCM WAVE (ex. "#DPCM 0,64,0,1,mA==")
 			{
 				exp = /^#DPCM\s.*$/gm;
@@ -2281,11 +2287,13 @@
 						wavs = "";
 						for(j = 1; j < wav.length; j++) wavs += wav[j];
 						arg = wavs.split(",");
-						if (	(int(arg[0]) >= 0) && 
-								(int(arg[1]) >= 0) && 
-								(int(arg[2]) >= 0) && 
-								(int(arg[3]) >= 0) && 
-								(arg[4].length > 0)			)
+						if (
+							(int(arg[0]) >= 0) && 
+							(int(arg[1]) >= 0) && 
+							(int(arg[2]) >= 0) && 
+							(int(arg[3]) >= 0) && 
+							(arg[4].length > 0)
+						)
 						{
 							waveNo = int(arg[0]);
 							if (waveNo >= MOscSmpDPCM.MAX_WAVE) waveNo = MOscSmpDPCM.MAX_WAVE-1;
@@ -2301,7 +2309,8 @@
 				}
 			}
 
-			// unsigned 8bit PCM WAVE (ex. "#U8PCM 0,44100,0,0,808080808080808080")
+			//                                    No/fSAM/key/loop/DecMode
+			// unsigned 8bit PCM WAVE (ex. "#U8PCM 0,44100,57,0,0,808080808080808080")
 			{
 				exp = /^#U8PCM\s.*$/gm;
 				matched = m_string.match(exp);
@@ -2313,25 +2322,69 @@
 						wavs = "";
 						for(j = 1; j < wav.length; j++) wavs += wav[j];
 						arg = wavs.split(",");
-						if (	(int(arg[0]) >= 0) && 
-								(Number(arg[1]) >= 2000.0) && 
-								(int(arg[2]) >= -1) && 
-								(int(arg[3]) >= 0) && 
-								(arg[4].length > 0)			)
+						if (
+							(int(arg[0]) >= 0) && 
+							(Number(arg[1]) >= 2000.0) && 
+							(int(arg[2]) >= 0) && 
+							(int(arg[3]) >= -1) && 
+							(int(arg[4]) >= 0) && 
+							(arg[5].length > 0)
+						)
 						{
 							waveNo = int(arg[0]);
 							if (waveNo >= MOscSmpU8PCM.MAX_WAVE) waveNo = MOscSmpU8PCM.MAX_WAVE-1;
 							var sFreq:Number = Number(arg[1]);
 							if (sFreq > 88200.0) sFreq = 88200.0;
-							var loopPt:int = int(arg[2]);
+							var sKey:int = int(arg[2]);
+							if (sKey > 119) sFreq = 119;
+							var loopPt:int = int(arg[3]);
 							if (loopPt > MOscSmpU8PCM.MAX_LENGTH) loopPt = MOscSmpU8PCM.MAX_LENGTH;
-							decMode = int(arg[3]);
+							decMode = int(arg[4]);
 							if (decMode > 1) decMode = 1;
-							MOscSmpU8PCM.setWave(waveNo, sFreq, loopPt, decMode, arg[4]);
+							MOscSmpU8PCM.setWave(waveNo, sFreq, sKey, loopPt, decMode, arg[5]);
 						}
 					}
 				}
 			}
+
+			//                             No/fSAM/key/loop/DecMode(0/1/10/11)
+			// 4bit ADPCM WAVE (ex. "#ADPCM 0,16000.0,57,0,0,808080808080808080")
+			{
+				exp = /^#ADPCM\s.*$/gm;
+				matched = m_string.match(exp);
+				if (matched) {
+					for(i = 0; i < matched.length; i++) {
+						m_string = m_string.replace(exp, "");
+						//trace(matched[i]);
+						wav = matched[i].split(" ");
+						wavs = "";
+						for(j = 1; j < wav.length; j++) wavs += wav[j];
+						arg = wavs.split(",");
+						if (
+							(int(arg[0]) >= 0) && 
+							(Number(arg[1]) >= 2000.0) && 
+							(int(arg[2]) >= 0) && 
+							(int(arg[3]) >= -1) && 
+							(int(arg[4]) >= 0) && 
+							(arg[5].length > 0)
+						)
+						{
+							waveNo = int(arg[0]);
+							if (waveNo >= MOscSmpADPCM.MAX_WAVE) waveNo = MOscSmpADPCM.MAX_WAVE-1;
+							sFreq = Number(arg[1]);
+							if (sFreq > 88200.0) sFreq = 88200.0;
+							sKey = int(arg[2]);
+							if (sKey > 119) sFreq = 119;
+							loopPt = int(arg[3]);
+							if (loopPt > MOscSmpADPCM.MAX_LENGTH) loopPt = MOscSmpADPCM.MAX_LENGTH;
+							decMode = int(arg[4]);
+							if ((decMode != 0) && (decMode != 1) && (decMode != 10) && (decMode != 11)) decMode = 0;
+							MOscSmpADPCM.setWave(waveNo, sFreq, sKey, loopPt, decMode, arg[5]);
+						}
+					}
+				}
+			}
+			
 
 			// macro
 			begin();

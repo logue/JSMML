@@ -1,30 +1,53 @@
 ﻿package com.flmml {
 	import __AS3__.vec.Vector;
-
-	public class MOscSmpU8PCM extends MOscMod {
+	
+	public class MOscSmpADPCM extends MOscMod {
 		public static const MAX_WAVE:int = 128;
 		public static const MAX_LENGTH:int = 1024 * 1024 * 2;
 		public static const MAX_TABLE_LEN:int = (MAX_LENGTH >> 2) + 4;
+		public static const ADPTYPE_YM:int = 0;
+		public static const ADPTYPE_MSM:int = 1;
 		protected static var s_init:int = 0;
 		protected static var s_table:Vector.<Vector.<uint>>;
 		protected static var s_sFreq:Vector.<Number>;	//サンプリング周波数
 		protected static var s_loopPt:Vector.<int>;		//ループポイント
 		protected static var s_length:Vector.<int>;		//再生レングス。１サンプル８ビットでサンプル数を持つ。
+		protected static var s_adpType:Vector.<int>;	//ADPCM Type。0:YM mode, 1:MSM mode
+		
+		protected static var s_YM_tbl1:Vector.<int> = Vector.<int>([
+			1,   3,   5,   7,   9,  11,  13,  15,
+			-1,  -3,  -5,  -7,  -9, -11, -13, -15,
+		]);
+		protected static var s_YM_tbl2:Vector.<int> = Vector.<int>([
+			57,  57,  57,  57,  77, 102, 128, 153,
+			57,  57,  57,  57,  77, 102, 128, 153,
+		]);
+		protected static var s_YM_adpcmX:int;
+		protected static var s_YM_adpcmD:int;
+		
+		protected static var s_MSM_IndexShift:Vector.<int> = Vector.<int>([
+			-1, -1, -1, -1, 2, 4, 6, 8,
+		]);
+		protected static var s_MSM_DiffLookup:Vector.<int>;
+		protected static var s_MSM_signal:int;
+		protected static var s_MSM_step:int;
+		
 		protected var m_waveNo:int;
 		protected var m_renderingMode:int;
 		protected var m_getNextSample:Function;
 		protected var m_interval:Number;
 		protected var m_position:Number;
+		protected var m_amp:Number;
 		protected var m_address:int = 0;		//読み込み中のアドレス位置
 		protected var m_bit:int = 0;			//読み込み中のビット位置
 		protected var m_wav:Number = 0.0;		//現在の変位
-		protected var m_length:int = 0;			//残り読み込み長
+		protected var m_length:int = 0;			//残りサンプル数
 		protected var m_NextWav:Number = 0.0;	//次回の変位
 		protected var m_NextDiff:Number = 0.0;	//次回変位への差分
 		
-		public function MOscSmpU8PCM() {
+		public function MOscSmpADPCM() {
 			boot();
-			m_modID = MOscillator.SMP_U8PCM;
+			m_modID = MOscillator.SMP_ADPCM;
 			super();
 			setWaveNo(0);
 			setRenderFunc(1);
@@ -36,39 +59,105 @@
 			s_sFreq = new Vector.<Number>(MAX_WAVE);
 			s_loopPt = new Vector.<int>(MAX_WAVE);
 			s_length = new Vector.<int>(MAX_WAVE);
+			s_adpType = new Vector.<int>(MAX_WAVE);
+			s_MSM_DiffLookup = new Vector.<int>(49*16);
 			setWave(0, 11025.0, 57, -1, 0, "8080808080808080");
 			s_init = 1;
+		}
+		private static function initMSMtable():void {
+			var step:int, stepval:int, nib:int;
+			for (step = 0; step <= 48; step++) {
+				stepval = Math.floor(16.0 * Math.pow(1.1, Number(step)));
+				for (nib = 0; nib < 16; nib++) {
+					s_MSM_DiffLookup[(step*16) + nib] = 
+						getNP(nib & 0x08) *
+						(
+							( stepval    * getZP(nib & 0x04)) +
+							((stepval/2) * getZP(nib & 0x02)) +
+							((stepval/4) * getZP(nib & 0x01)) +
+							( stepval/8 )
+						);
+				}
+			}
+		}
+		private static function getNP(n:int):int {
+			return (n == 0) ? 1 : (-1);
+		}
+		private static function getZP(n:int):int {
+			return (n == 0) ? 0 : (1);
+		}
+		private static function limitNumI(l1:int, l2:int, num:int):int {
+			var n:int = num;
+			if (n < l1) n = l1;
+			if (n > l2) n = l2;
+			return n;
 		}
 		public static function setWave(waveNo:int, sFreq:Number, sKey:int, loopPt:int, decMode:int, wave:String):void {
 			var basefreq:Number = (MChannel.s_BaseFreq) * Math.pow(2.0, ( (Number(sKey) - (MChannel.s_BaseNote) ) / (12.0) ) );
 			s_sFreq[waveNo]  = sFreq / basefreq;
 			s_loopPt[waveNo] = loopPt;
 			s_length[waveNo] = 0;
-			
-			if (decMode == 1) {
-				decodeBase64(waveNo, wave);
+			switch (decMode) {
+			case 0:
+				s_adpType[waveNo] = ADPTYPE_YM;
+				decodePlaintext(waveNo, ADPTYPE_YM, wave);
+				break;
+			case 1:
+				s_adpType[waveNo] = ADPTYPE_YM;
+				decodeBase64(waveNo, ADPTYPE_YM, wave);
+				break;
+			case 10:
+				s_adpType[waveNo] = ADPTYPE_MSM;
+				decodePlaintext(waveNo, ADPTYPE_MSM, wave);
+				break;
+			case 11:
+				s_adpType[waveNo] = ADPTYPE_MSM;
+				decodeBase64(waveNo, ADPTYPE_MSM, wave);
+				break;
+			default:
+				s_adpType[waveNo] = ADPTYPE_YM;
+				break;
 			}
-			else {
-				decodePlaintext(waveNo, wave);
-			}
-			
 			if ((s_loopPt[waveNo] >= 0) && (s_loopPt[waveNo] >= s_length[waveNo])) s_loopPt[waveNo] = s_length[waveNo] - 1;
 		}
-		private static function decodeBase64(waveNo:int, wave:String):void {
+		private static function initAdpcmDecodeVar():void {
+			s_YM_adpcmX = 0;
+			s_YM_adpcmD = 127;
+			s_MSM_signal = 0;
+			s_MSM_step = 0;
+		}
+		private static function decodeAdpcm(adp:int, mode:int):int {
+			var pcm:int;
+			var adpcm:int = (adp & 15);
+			if (mode == ADPTYPE_YM) {
+				s_YM_adpcmX = limitNumI(-32768, 32767, (s_YM_adpcmX + ((s_YM_tbl1[adpcm] * s_YM_adpcmD) / 8)) );
+				s_YM_adpcmD = limitNumI(   127, 24576, ((s_YM_adpcmD * s_YM_tbl2[adpcm]) / 64) );
+				pcm = s_YM_adpcmX & 0x0ffff;
+			}
+			else {
+				s_MSM_signal = limitNumI(-2048, 2047, (s_MSM_signal + s_MSM_DiffLookup[(s_MSM_step * 16) + adpcm]) );
+				s_MSM_step   = limitNumI(    0,   48, (s_MSM_step + s_MSM_IndexShift[(adpcm & 7)]) );
+				pcm = s_MSM_signal & 0x0ffff;
+			}
+			return pcm;
+		}
+		private static function decodeBase64(waveNo:int, mode:int, wave:String):void {
 			var strCnt:int = 0;
 			var intCnt:int = 0;
 			var intCn2:int = 0;
 			var intPos:int = 0;
 			var maxLen:int;
 			var code:int;
+			var adpcm:int = 0;
 			var i:int;
-			maxLen = (((wave.length * 3) >> 4) + 4);		//全体のbit数はlength*6、中身は8bit/sampleで、8bit/sampleを32bitのuint配列に。要素数は((文字数*6/8)*8/32)+保険(4)に。
+			maxLen = (((wave.length * 6) / 8) + 8);		// 全体のbit数はlength*6、中身は4bit/sampleで、16bit/sampleを32bitのuint配列に。要素数は((文字数*6/4)*16/32)+保険(8)に。
 			if (maxLen > MAX_TABLE_LEN) maxLen = MAX_TABLE_LEN;
 			s_table[waveNo] = new Vector.<uint>(maxLen);
 			for (i = 0; i < maxLen; i++) {
 				s_table[waveNo][i] = 0;
 			}
-
+			initAdpcmDecodeVar();
+			
 			for(strCnt = 0; strCnt < wave.length; strCnt++) {
 				code = wave.charCodeAt(strCnt);
 				if ((0x41 <= code) && (code <= 0x5a)) { //A-Z
@@ -92,16 +181,18 @@
 				else {
 					code = 0;
 				}
-				//抽出した6bitを1bitずつ積む。バイトオーダーはリトルエンディアン
+				//抽出した6bitを1bitずつ処理。
 				for(i = 5; i >=0 ; i--) {
-					s_table[waveNo][intPos] += ((code >> i) & 1) << (intCnt*8 + 7-intCn2);
+					adpcm += ((code >> i) & 1) << (3 - intCn2);
 					intCn2++;
-					if (intCn2 >= 8) {
-						intCn2=0;
-						intCnt++;
-						s_length[waveNo]++;			// 8bitごとに１サンプル
+					if (intCn2 >= 4) {
+						s_table[waveNo][intPos] += ( decodeAdpcm(adpcm, mode) << intCnt );
+						adpcm = 0;
+						intCn2 = 0;
+						intCnt += 16;
+						s_length[waveNo]++;			// 4bitごとに１サンプル
 					}
-					if (intCnt >= 4) {
+					if (intCnt >= 32) {
 						intCnt = 0;
 						intPos++;
 						if(intPos >= maxLen){
@@ -111,21 +202,23 @@
 				}
 			}
 		}
-		private static function decodePlaintext(waveNo:int, wave:String):void {
+		private static function decodePlaintext(waveNo:int, mode:int, wave:String):void {
 			var strCnt:int = 0;
 			var intCnt:int = 0;
 			var intCn2:int = 0;
 			var intPos:int = 0;
 			var maxLen:int;
 			var code:int;
+			var adpcm:int = 0;
 			var i:int;
-			maxLen = (((wave.length * 2) >> 4) + 4);		//全体のbit数はlength*4、中身は8bit/sampleで、8bit/sampleを32bitのuint配列に。要素数は((文字数*4/8)*8/32)+保険(4)に。
+			maxLen = (((wave.length * 4) / 8) + 8);		// 全体のbit数はlength*4、中身は4bit/sampleで、16bit/sampleを32bitのuint配列に。要素数は((文字数*4/4)*16/32)+保険(8)に。
 			if (maxLen > MAX_TABLE_LEN) maxLen = MAX_TABLE_LEN;
 			s_table[waveNo] = new Vector.<uint>(maxLen);
 			for (i = 0; i < maxLen; i++) {
 				s_table[waveNo][i] = 0;
 			}
-
+			initAdpcmDecodeVar();
+			
 			for(strCnt = 0; strCnt < wave.length; strCnt++) {
 				code = wave.charCodeAt(strCnt);
 				if ((0x41 <= code) && (code <= 0x46)) { //A-F
@@ -140,16 +233,18 @@
 				else {
 					code = 0;
 				}
-				//抽出した4bitを1bitずつ積む。バイトオーダーはリトルエンディアン
-				for(i = 3; i >= 0 ; i--) {
-					s_table[waveNo][intPos] += ((code >> i) & 1) << (intCnt*8 + 7-intCn2);
+				//抽出した4bitを1bitずつ処理。
+				for(i = 3; i >=0 ; i--) {
+					adpcm += ((code >> i) & 1) << (3 - intCn2);
 					intCn2++;
-					if (intCn2 >= 8) {
-						intCn2=0;
-						intCnt++;
-						s_length[waveNo]++;			// 8bitごとに１サンプル
+					if (intCn2 >= 4) {
+						s_table[waveNo][intPos] += ( decodeAdpcm(adpcm, mode) << intCnt );
+						adpcm = 0;
+						intCn2 = 0;
+						intCnt += 16;
+						s_length[waveNo]++;			// 4bitごとに１サンプル
 					}
-					if (intCnt >= 4) {
+					if (intCnt >= 32) {
 						intCnt = 0;
 						intPos++;
 						if(intPos >= maxLen){
@@ -162,19 +257,21 @@
 		private function prepareNextValue():void {
 			var val:int;
 			if (m_length > 0) {
-				val = (s_table[m_waveNo][m_address] >> m_bit) & 0x0ff;
-				m_NextWav = (Number(val) / 127.5) - 1.0;
+				val = (s_table[m_waveNo][m_address] >> m_bit) & 0x0ffff;
+				if ((val & 0x08000) != 0) {
+					val |= 0xffff0000;
+				}
+				m_NextWav = Number(val) / m_amp;
 				m_NextDiff = m_NextWav - m_wav;
 			}
 		}
 		private function getValue():Number {
-			var val:int;
 			if (m_length > 0) {
 				m_wav = m_NextWav;
 				m_length--;
 				if (m_length > 0) {
 					//残りがある場合はポインタを進める
-					m_bit += 8;
+					m_bit += 16;
 					if (m_bit >= 32) {
 						m_bit = 0;
 						m_address++;
@@ -183,8 +280,8 @@
 				else {
 					//残りが無い場合はループ時の更新と線形補完用差分のクリア
 					if (s_loopPt[m_waveNo] >= 0) {
-						m_address = (s_loopPt[m_waveNo] >> 2);
-						m_bit = (s_loopPt[m_waveNo] % 4) * 8;
+						m_address = (s_loopPt[m_waveNo] >> 1);
+						m_bit = (s_loopPt[m_waveNo] % 2) * 16;
 						m_length = s_length[m_waveNo] - s_loopPt[m_waveNo];
 					}
 					m_NextDiff = 0.0;
@@ -245,14 +342,14 @@
 		public function setRenderFunc(mode:int):void {
 			var n:int = mode;
 			switch(mode) {
-				case 0:
-					m_getNextSample = getNextSample0;	//０次補完モード
-					break;
-				default:
-					n = 1;								//規定外指定は１番指定に矯正
-				case 1:
-					m_getNextSample = getNextSample1;	//１次補完モード
-					break;
+			case 0:
+				m_getNextSample = getNextSample0;	//０次補完モード
+				break;
+			default:
+				n = 1;								//規定外指定は１番指定に矯正
+			case 1:
+				m_getNextSample = getNextSample1;	//１次補完モード
+				break;
 			}
 			m_renderingMode = n;
 		}
@@ -262,24 +359,33 @@
 			if (n < 0) n = 0;
 			if (s_table[n] == null) n = 0;		//未定義波形番号へのリクエストは０番に矯正
 			m_waveNo = n;
-			resetPhase();
+			if (s_adpType[m_waveNo] == ADPTYPE_YM) {
+				m_amp = 32768.0;
+			}
+			else if (s_adpType[m_waveNo] == ADPTYPE_MSM) {
+				m_amp = 2048.0;
+			}
+			else {
+				m_amp = 32768.0;
+			}
+			resetPhase();		//resetPhase() は m_amp 確定後に呼ぶ
 		}
 		public override function setYControl(m:int, f:int, n:Number):void {
 			if (m_modID != m) return;
 			switch (f) {
-				default:
-				case 0:		//func.0: No Operation
-					break;
-				case 1:		//func.1: setWaveNo
-					setWaveNo(int(n));
-					break;
-				case 2:		//func.2: setRenderFunc
-					setRenderFunc(int(n));
-					break;
-				case 3:		//func.3: setDetune
-					break;
-				case 4:		//func.4: reserved
-					break;
+			default:
+			case 0:		//func.0: No Operation
+				break;
+			case 1:		//func.1: setWaveNo
+				setWaveNo(int(n));
+				break;
+			case 2:		//func.2: setRenderFunc
+				setRenderFunc(int(n));
+				break;
+			case 3:		//func.3: setDetune
+				break;
+			case 4:		//func.4: reserved
+				break;
 			}
 		}
 	}

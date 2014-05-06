@@ -13,5 +13,6 @@
 	<item url="smp009.txt">音源：@@9 ＦＭ音源</item>
 	<item url="smp010.txt">音源：@@10 FC-DPCM</item>
 	<item url="smp011.txt">音源：@@11 Unsigned 8bit PCM</item>
+	<item url="smp012.txt">音源：@@12 4bit ADPCM</item>
 	<item url="smp020.txt">ノートオン時の位相リセットと非リセット</item>
 </playlist>

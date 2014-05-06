@@ -2,23 +2,27 @@
 	import __AS3__.vec.Vector;
 
 	public class MOscSaw extends MOscMod {
-		public  static const MAX_WAVE:int  = 3;
-		private static const MAX_EXOP:int  = 3;
+		private static const MAX_EXOP:int  = 4;
 		
 		private static const OP_DETUNE:int = 0;
 		private static const OP_FREQ:int   = 1;
 		private static const OP_FSHIFT:int = 2;
 		private static const OP_PHASE:int  = 3;
-		private static const OP_VAL:int    = 4;
-		private static const OP_MAX:int    = 5;
+		private static const OP_AMP:int    = 4;
+		private static const OP_VAL:int    = 5;
+		private static const OP_MAX:int    = 6;
+		
+		private static const DEF_DETUNE:Number = 8.0;
+		private static const DEF_DT_MAX:Number = 3600.0;
+		private static const DEF_DT_MIN:Number = -3600.0;
+		private static const DEF_LV_MIN:Number = -60.0;
 		
 		protected static var s_init:int = 0;
 		protected var m_waveNo:int;
 		protected var m_getValue:Function;
-		protected var m_setFrequency:Function;
-		protected var m_resetPhaseExec:Function;
 		protected var m_op:Vector.<Vector.<Number>>;
 		protected var m_detune:Number;
+		protected var m_ampDenom:Number;
 		protected var m_val:Number;
 
 		public function MOscSaw() {
@@ -29,10 +33,8 @@
 			//初期関数のセット
 			m_waveNo = 0;
 			m_getValue = getValueW0;
-			m_setFrequency = setFrequencyW0;
-			m_resetPhaseExec = resetPhaseExecW0;
 			//初期変数のセット
-			m_detune = 0.0;
+			m_detune = DEF_DETUNE;
 			m_val = 0.0;
 			//初期設定
 			initOp();
@@ -44,12 +46,16 @@
 		}
 		private function initOp():void {
 			var i:int;
-			setFrequencyW30(440.0);			//全OP強制初期化
-			setDetune(8.0);					//初期detuneは 8 cent
 			for (i = 0; i < MAX_EXOP; i++) {
+				m_op[i][OP_DETUNE] = 0.0;
+				m_op[i][OP_FREQ]   = 440.0;
+				m_op[i][OP_FSHIFT] = m_op[i][OP_FREQ] / 44100.0;
 				m_op[i][OP_PHASE]  = 0.0;
+				m_op[i][OP_AMP]    = 1.0;
 				m_op[i][OP_VAL]    = 0.0;
 			}
+			m_ampDenom = 1.0;
+			setDetune(m_detune);
 		}
 		private function newVect2DN(d1:int, d2:int):Vector.<Vector.<Number>> {
 			var a:Vector.<Vector.<Number>> = new Vector.<Vector.<Number>>(d1);
@@ -75,7 +81,7 @@
 			a = 0.5 - (op[OP_FSHIFT] / 2.0);
 			b = 0.5 + (op[OP_FSHIFT] / 2.0);
 			if ((op[OP_PHASE] >= a) && (op[OP_PHASE] < b)) {
-				op[OP_VAL] = 1.0 - (((op[OP_PHASE] - a) / m_freqShift) * 2.0);
+				op[OP_VAL] = 1.0 - (((op[OP_PHASE] - a) / op[OP_FSHIFT]) * 2.0);
 			}
 			else {
 				if   (op[OP_PHASE] < 0.5) op[OP_VAL] = 0.0 + (2.0 * op[OP_PHASE]);
@@ -102,27 +108,16 @@
 			op[OP_DETUNE] = detune;
 		}
 		
+		private function setAmplvOP(op:Vector.<Number>, lv:Number):void {
+			op[OP_AMP] = Math.pow(10.0, (lv/20.0));		//lv:dB
+		}
+		
 		private function syncOperatorOP(op:Vector.<Number>):void {
 			setFrequencyOP(op, m_frequency);
 			resetPhaseExecOP(op);
 		}
 		// Operator Func. end -----------------------------
 		
-		private function resetPhaseExecW0():void {
-			resetPhaseExecOP(m_op[0]);
-			m_phase = m_op[0][OP_PHASE];
-		}
-		private function resetPhaseExecW20():void {
-			resetPhaseExecOP(m_op[0]);
-			resetPhaseExecOP(m_op[1]);
-			m_phase = m_op[0][OP_PHASE];
-		}
-		private function resetPhaseExecW30():void {
-			resetPhaseExecOP(m_op[0]);
-			resetPhaseExecOP(m_op[1]);
-			resetPhaseExecOP(m_op[2]);
-			m_phase = m_op[0][OP_PHASE];
-		}
 		
 		private function getValueW0():void {
 			getValueOP(m_op[0]);
@@ -132,35 +127,32 @@
 		private function getValueW20():void {
 			getValueOP(m_op[0]);
 			getValueOP(m_op[1]);
-			m_val = (m_op[0][OP_VAL] + m_op[1][OP_VAL]) / 2.0;
+			m_val = ((m_op[0][OP_VAL] * m_op[0][OP_AMP]) + (m_op[1][OP_VAL] * m_op[1][OP_AMP])) / m_ampDenom;
 			m_phase = m_op[0][OP_PHASE];
 		}
 		private function getValueW30():void {
 			getValueOP(m_op[0]);
 			getValueOP(m_op[1]);
 			getValueOP(m_op[2]);
-			m_val = (m_op[0][OP_VAL] + m_op[1][OP_VAL] + m_op[2][OP_VAL]) / 3.0;
+			m_val = (
+						(m_op[0][OP_VAL] * m_op[0][OP_AMP]) +
+						(m_op[1][OP_VAL] * m_op[1][OP_AMP]) +
+						(m_op[2][OP_VAL] * m_op[2][OP_AMP])
+					) / m_ampDenom;
 			m_phase = m_op[0][OP_PHASE];
 		}
-		
-		private function setFrequencyW(frequency:Number):void {
-			m_frequency = frequency;
-			m_freqShift = frequency / 44100.0;
-		}
-		private function setFrequencyW0(frequency:Number):void {
-			setFrequencyW(frequency);
-			setFrequencyOP(m_op[0], frequency);
-		}
-		private function setFrequencyW20(frequency:Number):void {
-			setFrequencyW(frequency);
-			setFrequencyOP(m_op[0], frequency);
-			setFrequencyOP(m_op[1], frequency);
-		}
-		private function setFrequencyW30(frequency:Number):void {
-			setFrequencyW(frequency);
-			setFrequencyOP(m_op[0], frequency);
-			setFrequencyOP(m_op[1], frequency);
-			setFrequencyOP(m_op[2], frequency);
+		private function getValueW40():void {
+			getValueOP(m_op[0]);
+			getValueOP(m_op[1]);
+			getValueOP(m_op[2]);
+			getValueOP(m_op[3]);
+			m_val = (
+						(m_op[0][OP_VAL] * m_op[0][OP_AMP]) +
+						(m_op[1][OP_VAL] * m_op[1][OP_AMP]) +
+						(m_op[2][OP_VAL] * m_op[2][OP_AMP]) +
+						(m_op[3][OP_VAL] * m_op[3][OP_AMP])
+					) / m_ampDenom;
+			m_phase = m_op[0][OP_PHASE];
 		}
 		
 		
@@ -177,21 +169,43 @@
 		
 		
 		public override function setFrequency(frequency:Number):void {
-			m_setFrequency(frequency);
+			m_frequency = frequency;
+			m_freqShift = m_frequency / 44100.0;
+			var i:int;
+			for (i=0; i<MAX_EXOP; i++) {
+				setFrequencyOP(m_op[i], m_frequency);
+			}
 		}
 		public override function resetPhaseExec():void {
-			m_resetPhaseExec();
+			var i:int;
+			for (i=0; i<MAX_EXOP; i++) {
+				resetPhaseExecOP(m_op[i]);
+			}
+			m_phase = m_op[0][OP_PHASE];
 		}
 		public function setDetune(detune:Number):void {
-			var d:int = detune;
-			if (m_detune == detune) return;		//同値による再設定防止
-			if (d >   100 ) d = 100;
-			if (d < (-100)) d = (-100);
-			m_detune = d;
+			m_detune = limitNum(-100.0, 100.0, detune);
 			setDetuneOP(m_op[0], 0.0);
 			setDetuneOP(m_op[1], m_detune);
-			setDetuneOP(m_op[2], (m_detune * (-1)));
-			setFrequencyW30(m_frequency);
+			setDetuneOP(m_op[2], (m_detune * (-1.0)));
+			setDetuneOP(m_op[3], (m_detune / 2.0));
+			setFrequency(m_frequency);
+		}
+		private function refreshAmpDenom():void {
+			switch (m_waveNo) {
+				default:
+					m_ampDenom = 1.0;
+					break;
+				case 20:
+					m_ampDenom = m_op[0][OP_AMP] + m_op[1][OP_AMP];
+					break;
+				case 30:
+					m_ampDenom = m_op[0][OP_AMP] + m_op[1][OP_AMP] + m_op[2][OP_AMP];
+					break;
+				case 40:
+					m_ampDenom = m_op[0][OP_AMP] + m_op[1][OP_AMP] + m_op[2][OP_AMP] + m_op[3][OP_AMP];
+					break;
+			}
 		}
 		public override function setWaveNo(waveNo:int):void {
 			var n:int = waveNo;
@@ -203,26 +217,30 @@
 				if (m_waveNo == n) return;		//過去０番だった時、同番号指定による再初期化防止
 			case 0:
 				m_getValue = getValueW0;
-				m_setFrequency = setFrequencyW0;
-				m_resetPhaseExec = resetPhaseExecW0;
 				break;
 			case 20:
 				m_getValue = getValueW20;
-				m_setFrequency = setFrequencyW20;
-				m_resetPhaseExec = resetPhaseExecW20;
 				break;
 			case 30:
 				m_getValue = getValueW30;
-				m_setFrequency = setFrequencyW30;
-				m_resetPhaseExec = resetPhaseExecW30;
+				break;
+			case 40:
+				m_getValue = getValueW40;
 				break;
 			}
 			m_waveNo = n;
-			syncOperatorOP(m_op[0]);
-			syncOperatorOP(m_op[1]);
-			syncOperatorOP(m_op[2]);
+			var i:int;
+			for (i=0; i<MAX_EXOP; i++) {
+				syncOperatorOP(m_op[i]);
+			}
+			refreshAmpDenom();
 		}
 		
+		private function limitNum(min:Number, max:Number, n:Number):Number {
+			if (n < min) return min;
+			if (n > max) return max;
+			return n;
+		}
 		public override function setYControl(m:int, f:int, n:Number):void {
 			if (m_modID != m) return;
 			switch (f) {
@@ -239,6 +257,42 @@
 				setDetune(n);
 				break;
 			case 4:		//func.4: reserved
+				break;
+			case 10:	//sp.func.10: OP1-OP4 Detune/AmpLv reset
+				setDetune(n);
+				var i:int;
+				for (i=0; i<MAX_EXOP; i++) {
+					setAmplvOP(m_op[i], 0.0);
+				}
+				refreshAmpDenom();
+				break;
+			case 11:	//sp.func.11: OP1-Detune
+				setDetuneOP(m_op[0], limitNum(DEF_DT_MIN, DEF_DT_MAX, n));
+				break;
+			case 12:	//sp.func.12: OP1-AmpLv
+				setAmplvOP( m_op[0], limitNum(DEF_LV_MIN, 0.0, n));
+				refreshAmpDenom();
+				break;
+			case 21:	//sp.func.21: OP2-Detune
+				setDetuneOP(m_op[1], limitNum(DEF_DT_MIN, DEF_DT_MAX, n));
+				break;
+			case 22:	//sp.func.22: OP2-AmpLv
+				setAmplvOP( m_op[1], limitNum(DEF_LV_MIN, 0.0, n));
+				refreshAmpDenom();
+				break;
+			case 31:	//sp.func.31: OP3-Detune
+				setDetuneOP(m_op[2], limitNum(DEF_DT_MIN, DEF_DT_MAX, n));
+				break;
+			case 32:	//sp.func.32: OP3-AmpLv
+				setAmplvOP( m_op[2], limitNum(DEF_LV_MIN, 0.0, n));
+				refreshAmpDenom();
+				break;
+			case 41:	//sp.func.41: OP4-Detune
+				setDetuneOP(m_op[3], limitNum(DEF_DT_MIN, DEF_DT_MAX, n));
+				break;
+			case 42:	//sp.func.42: OP4-AmpLv
+				setAmplvOP( m_op[3], limitNum(DEF_LV_MIN, 0.0, n));
+				refreshAmpDenom();
 				break;
 			}
 		}

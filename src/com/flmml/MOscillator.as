@@ -14,7 +14,8 @@
 		public static const OPMS:int       = 9;
 		public static const SMP_DPCM:int   = 10;
 		public static const SMP_U8PCM:int  = 11;
-		public static const MAX:int        = 12;
+		public static const SMP_ADPCM:int  = 12;
+		public static const MAX:int        = 13;
 
 		protected static var s_init:int = 0;
 		protected var m_osc:Vector.<MOscMod>;
@@ -36,6 +37,7 @@
 			m_osc[OPMS]       = new MOscOPMS();
 			m_osc[SMP_DPCM]   = new MOscSmpDPCM();
 			m_osc[SMP_U8PCM]  = new MOscSmpU8PCM();
+			m_osc[SMP_ADPCM]  = new MOscSmpADPCM();
 			setForm(PULSE);
 			setNoiseModToPulseMod();
 		}
@@ -53,6 +55,7 @@
 			MOscOPMS.boot();
 			MOscSmpDPCM.boot();
 			MOscSmpU8PCM.boot();
+			MOscSmpADPCM.boot();
 			s_init = 1;
 		}
 		public function setForm(form:int):MOscMod {
