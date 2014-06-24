@@ -187,6 +187,9 @@
 						m_bit = (s_loopPt[m_waveNo] % 4) * 8;
 						m_length = s_length[m_waveNo] - s_loopPt[m_waveNo];
 					}
+					else {
+						m_wav = 0.0;
+					}
 					m_NextDiff = 0.0;
 				}
 				prepareNextValue();

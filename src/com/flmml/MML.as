@@ -7,7 +7,7 @@
 	public class MML extends EventDispatcher {
 		public static const DEF_FORM:int = 3;
 		public static const DEF_SUBFORM:int = 0;
-		public static const DEF_DETUNE_RESO:int = 100;
+		public static const DEF_DETUNE_RESO:Number = 100.0;
 		public static const DEF_VSMAX:int = 15;
 		public static const DEF_VSRATE:Number = 3.0;
 		public static const DEF_VOL:Number = 13.0;
@@ -20,11 +20,11 @@
 		public static const DEF_PWMNUM:Number = 4.0;
 		public static const DEF_PWMDNM:Number = 8.0;
 		public static const DEF_NZMOD:int = 7;
-		public static const DEF_MAX_L_CLK:Number = 1.0 / 1.0;
-		public static const DEF_MIN_L_CLK:Number = 1.0 / 300.0;
-		public static const DEF_MAX_E_CLK:Number = 1.0 / 1.0;
-		public static const DEF_MIN_E_CLK:Number = 1.0 / 1000.0;
-		public static const DEF_MAX_DELAY_CT:int = 44100 * 2;
+		public static const DEF_MAX_L_CLK:Number = (1.0 / 1.0);
+		public static const DEF_MIN_L_CLK:Number = (1.0 / 300.0);
+		public static const DEF_MAX_E_CLK:Number = (1.0 / 1.0);
+		public static const DEF_MIN_E_CLK:Number = (1.0 / 1000.0);
+		public static const DEF_MAX_DELAY_CT:int = (44100 * 2);
 		public static const DEF_MIN_DELAY_CT:int = 4;
 		public static const DEF_MAX_DELAY_LV:Number = (-0.2);
 		public static const DEF_MIN_DELAY_LV:Number = (-96.0);
@@ -32,50 +32,51 @@
 		public static var s_tickUnit:Number = 192.0;
 		public static var s_reportTotalTicks:Boolean;
 		
-		//●印は、createTrack()の時に初期化が必要
+		//基本的に、createTrack()の時に初期化が必要（initMMLvariable()）
 		protected static const MAX_POLYVOICE:int = 64;
 		protected var m_sequencer:MSequencer;
 		protected var m_tracks:Vector.<MTrack>;
 		protected var m_string:String;
 		protected var m_trackNo:int;
-		protected var m_octave:int;				// ●
+		protected var m_octave:int;				// 現在のオクターブ
 		protected var m_relativeDir:Boolean;	// 相対オクターブ記号向き切り替え
-		protected var m_detune:int;				// ●デチューン
-		protected var m_detuneReso:int;			// ●デチューン分解能（半音を何分割するか）
-		protected var m_VscaleMax:int;			// ●Volumeスケール管理：最大値
-		protected var m_VscaleRate:Number;		// ●Volumeスケール管理：減衰率（０のとき線形、正数のときdB）
-		protected var m_volume:Number;			// ●ボリューム値管理
-		protected var m_volumeOffset:Number;	// ●ボリュームオフセット値
-		protected var m_volumeMagNum:Number;	// ●ボリューム倍率値の分子
-		protected var m_volumeMagDenom:Number;	// ●ボリューム倍率値の分母
-		protected var m_volumeCalcPriority:int;	// ●ボリューム計算（オフセットと倍率）の優先順位（0:倍率を先行計算(def), 1:オフセットを先行計算）
-		protected var m_volumeRoundMode:int;	// ●ボリューム計算結果の少数以下の丸めモード（0:丸め無し(def), 1:切り捨て, 2:四捨五入, 3:切り上げ）
-		protected var m_volumeCurrent:Number;	// ●ボリューム計算結果
+		protected var m_detune:Number;			// デチューン
+		protected var m_detuneReso:Number;		// デチューン分解能（半音を何分割するか）
+		protected var m_VscaleMax:int;			// Volumeスケール管理：最大値
+		protected var m_VscaleRate:Number;		// Volumeスケール管理：減衰率（０のとき線形、正数のときdB）
+		protected var m_volume:Number;			// ボリューム値管理
+		protected var m_volumeOffset:Number;	// ボリュームオフセット値
+		protected var m_volumeMagNum:Number;	// ボリューム倍率値の分子
+		protected var m_volumeMagDenom:Number;	// ボリューム倍率値の分母
+		protected var m_volumeCalcPriority:int;	// ボリューム計算（オフセットと倍率）の優先順位（0:倍率を先行計算(def), 1:オフセットを先行計算）
+		protected var m_volumeRoundMode:int;	// ボリューム計算結果の少数以下の丸めモード（0:丸め無し(def), 1:切り捨て, 2:四捨五入, 3:切り上げ）
+		protected var m_volumeCurrent:Number;	// ボリューム計算結果
 		protected var m_vDir:Boolean;			// 相対ボリューム記号向き切り替え
-		protected var m_length:int;				// ●デフォルト音長（tickカウント数）
-		protected var m_lengthDiv:Number;		// ●デフォルト音長（全音符の分割数 for debug disp）
+		protected var m_length:int;				// デフォルト音長（tickカウント数）
+		protected var m_lengthDiv:Number;		// デフォルト音長（全音符の分割数 for debug disp）
 		protected var m_tempo:Number;
 		protected var m_totalTicks:uint;		// コンパイル時のチェック用Ticksカウンタ
 		protected var m_totalOvFlow:Boolean;	// コンパイル時のチェック用フラグ
 		protected var m_letter:int;				// 現在のMML解析位置
-		protected var m_keyoff:int;
-		protected var m_form:int;
-		protected var m_subForm:int;
-		protected var m_pwmNum:Number;			// ●pwmの分子
-		protected var m_pwmDenom:Number;		// ●pwmの分母
-		protected var m_gate:int;				// ●qの分子
-		protected var m_maxGate:int;			// ●qの分母
-		protected var m_gateTicks1:int;			// ●q%のticks
-		protected var m_gateTicks2:int;			// ●@qのticks
-		protected var m_noteShift:int;			// ●
-		protected var m_AEnvLvRdMode:int;		// ●
-		protected var m_AEnvLvDenom:Number;		// ●
-		protected var m_AEnvLvOffset:Number;	// ●
-		protected var m_noiseModDest:int;		// ●
-		protected var m_delayCountMax:int;		// ●
+		protected var m_keyoff:int;				// 0:スラーモード中  1:通常
+		protected var m_form:int;				// 音源モジュール番号
+		protected var m_subForm:int;			// 音源モジュールの枝番
+		protected var m_pwmNum:Number;			// pwmの分子
+		protected var m_pwmDenom:Number;		// pwmの分母
+		protected var m_gate:int;				// qの分子
+		protected var m_maxGate:int;			// qの分母
+		protected var m_gateTicks1:int;			// q%のticks
+		protected var m_gateTicks2:int;			// @qのticks
+		protected var m_noteShift:int;			// ノートシフト値
+		protected var m_AEnvLvRdMode:int;		// 音量ENVレベルの丸めモード。0 は滑らかモード。
+		protected var m_AEnvLvDenom:Number;		// 音量ENVレベルの分母指定。0.0 は特例で分母にm_VXscaleMaxを採用するモード。
+		protected var m_AEnvLvOffset:Number; 	// 音量ENVレベルへのオフセット。
+		protected var m_noiseModDest:int;
+		protected var m_delayCountMax:int;		// ディレイエフェクトの最大サンプル数。０でディレイ無効。
 		protected var m_warning:String;
-		protected var m_beforeNote:int;
-		protected var m_portamento:int;
+		protected var m_beforeNote:int;			// ポルタメント開始音程
+		protected var m_portamento:int;			// 1:ポルタメント処理中  0:通常
+		protected var m_chordStart:int;			// 1:和音表記の受付中  0:通常
 		protected var m_usingPoly:Boolean;
 		protected var m_polyVoice:int;
 		protected var m_polyForce:Boolean;
@@ -148,13 +149,23 @@
 					}
 					len = getUInt(0);
 					if (tie == 1 && len == 0) {
-						m_keyoff = 0;
-						break;
+						if (m_chordStart == 1) {
+							m_warning += "[Track:" + m_trackNo + "] 和音記法開始([)受付中のスラー記号(&)はスキップします。\n";
+							tie = 0;
+							break;		//while脱出
+						}
+						else {
+							//スラーと識別してwhile脱出
+							m_keyoff = 0;
+							break;
+						}
 					}
+					//通常音長取得またはタイ時の追加音長加算
 					tickTemp = (lenMode ? len : len2tick(len));
 					tick += getDot(tickTemp);
 					tie = 0;
-					if (getChar() == '&') { // tie
+					if (getChar() == '&') {
+						//タイまたはスラーを検出、tieを1にしてwhileループ継続
 						tie = 1;
 						next();
 					}
@@ -164,16 +175,11 @@
 				}
 				
 				if (checkLimitOfPlayTime(tick) == true) {
-					
 					if (m_portamento == 1) { // ポルタメントなら
 						m_tracks[m_trackNo].recPortamento(m_beforeNote - (noteNo + (m_octave * 12)), tick);
-					}
-					m_tracks[m_trackNo].recNote(noteNo + (m_octave * 12), tick, keyon, m_keyoff);
-					if (m_portamento == 1) { // ポルタメントなら
-						m_tracks[m_trackNo].recPortamento(0, 0);
 						m_portamento = 0;
 					}
-					
+					m_tracks[m_trackNo].recNote(noteNo + (m_octave * 12), tick, keyon, m_keyoff);
 				}
 				else {
 					if (m_portamento == 1) {
@@ -195,7 +201,7 @@
 			var tick:int = lenMode ? len : len2tick(len);
 			tick = getDot(tick);
 			if (m_keyoff == 0) {
-				//タイ中に休符を受け付けた場合、ノートオフし、タイモード終了
+				//スラー中に休符を受け付けた場合、ノートオフし、スラーモード終了
 				m_tracks[m_trackNo].recNoteOff(-1);
 				m_keyoff = 1;
 			}
@@ -427,33 +433,60 @@
 				next();
 				c0 = getChar();
 				if (c0 == 'h') {
-					// @mh: OPM HARD LFO
 					next();
-					var wf:int = 0, freq:int = 0;
-					var pmd:int = 0, amd:int = 0, pms:int = 0, ams:int = 0, sync:int = 0;
-					do {
-					wf = getUInt(wf);
-					if (getChar() != ',') break;
-					next();
-					freq = getUInt(freq);
-					if (getChar() != ',') break;
-					next();
-					pmd = getUInt(pmd);
-					if (getChar() != ',') break;
-					next();
-					amd = getUInt(amd);
-					if (getChar() != ',') break;
-					next();
-					pms = getUInt(pms);
-					if (getChar() != ',') break;
-					next();
-					ams = getUInt(ams);
-					if (getChar() != ',') break;
-					next();
-					sync = getUInt(sync);
+					c1 = getChar();
+					if ( chkCharIsNum(c1) == true ) {
+						// @mh: OPM HARD LFO
+						var wf:int = 0, freq:int = 0;
+						var pmd:int = 0, amd:int = 0, pms:int = 0, ams:int = 0, sync:int = 0;
+						do {
+							wf = getUInt(wf);
+							if (getChar() != ',') break;
+							next();
+							freq = getUInt(freq);
+							if (getChar() != ',') break;
+							next();
+							pmd = getUInt(pmd);
+							if (getChar() != ',') break;
+							next();
+							amd = getUInt(amd);
+							if (getChar() != ',') break;
+							next();
+							pms = getUInt(pms);
+							if (getChar() != ',') break;
+							next();
+							ams = getUInt(ams);
+							if (getChar() != ',') break;
+							next();
+							sync = getUInt(sync);
+						}
+						while (false);
+						m_tracks[m_trackNo].recOPMHwLfo(0, wf, freq, pmd, amd, pms, ams, sync);
 					}
-					while (false);
-					m_tracks[m_trackNo].recOPMHwLfo(wf, freq, pmd, amd, pms, ams, sync);
+					else if (c1 == 'a') {
+						// @mha: OPNA HARD LFO
+						var freq2:int = 0, pms2:int = 0, ams2:int = 0, sync2:int = 0;
+						next();
+						do {
+							freq2 = getUInt(freq2);
+							if (getChar() != ',') break;
+							next();
+							pms2 = getUInt(pms2);
+							if (getChar() != ',') break;
+							next();
+							ams2 = getUInt(ams2);
+							if (getChar() != ',') break;
+							next();
+							sync2 = getUInt(sync2);
+						}
+						while (false);
+						m_tracks[m_trackNo].recOPMHwLfo(1, 0, freq2, 0, 0, pms2, ams2, sync2);
+					}
+					else {
+						// 未定義コマンド
+						warning("[Track:" + m_trackNo + "] ", MWarning.UNKNOWN_COMMAND, "@"+c+c0+c1);
+						next();
+					}
 				}
 				else if (c0 == 'r') {
 					// @mr: opM envelope generator Reset mode every note-on
@@ -565,7 +598,9 @@
 					// @pl: poly mode
 					next();
 					o = getUInt(m_polyVoice);
-					o = Math.max(0, Math.min(m_polyVoice, o));
+					if (o > m_polyVoice) {
+						o = m_polyVoice;
+					}
 					m_tracks[m_trackNo].recPoly(o);
 				}
 				else if (c0 == 'h') {
@@ -610,14 +645,14 @@
 				c0 = getChar();
 				if ( (chkCharIsNum(c0) == true) || (c0 == '-') || (c0 == '+') ) {
 					// @d: Detune
-					m_detune = getSInt(m_detune);
-					o = 0;			//変化単位の指定が無い場合は０。変化単位が０だとMChannel.setPitchResolution()で捨てられる（反映されない）。
+					m_detune = getSNumber(m_detune);
+					n = 0.0;			//分解能の指定が無い場合は０。分解能が10〜1000以外だとMChannel.setPitchResolution()で捨てられる（反映されない）。
 					if (getChar() == ',') {
 						next();
-						o = getUInt(DEF_DETUNE_RESO);
+						n = Number( getUInt(int(DEF_DETUNE_RESO)) );		//分解能はuintで取得
 					}
-					if (o != 0) m_detuneReso = o;				//for debug disp
-					m_tracks[m_trackNo].recDetune(m_detune, o);
+					if (n != 0.0) m_detuneReso = n;				//for debug disp
+					m_tracks[m_trackNo].recDetune(m_detune, int(n));
 				}
 				else if (getChar() == 'l') {
 					next();
@@ -966,7 +1001,7 @@
 			case 'z': // @z: damp off envelope
 				next();
 				if (m_keyoff == 0) {
-					//タイ中に @z を受け付けた場合、ノートオフし、タイモード終了
+					//スラー中に @z を受け付けた場合、ノートオフし、スラーモード終了
 					m_tracks[m_trackNo].recNoteOff(-1);
 					m_keyoff = 1;
 				}
@@ -1304,10 +1339,28 @@
 				}
 				break;
 			case '[':
-				m_tracks[m_trackNo].recChordStart();
+				if (m_keyoff == 0) {
+					m_warning += "[Track:" + m_trackNo + "] スラー(&)受付中の和音記法開始([)はスキップします。\n";
+				}
+				else if (m_portamento == 1) {
+					m_warning += "[Track:" + m_trackNo + "] ポルタメント(*)受付中の和音記法開始([)はスキップします。\n";
+				}
+				else if (m_chordStart == 1) {
+					m_warning += "[Track:" + m_trackNo + "] 和音記法開始([)受付中の再度開始([)はスキップします。\n";
+				}
+				else {
+					m_tracks[m_trackNo].recChordStart();
+					m_chordStart = 1;
+				}
 				break;
 			case ']':
-				m_tracks[m_trackNo].recChordEnd();
+				if (m_chordStart != 1) {
+					m_warning += "[Track:" + m_trackNo + "] 和音記法が開始([)されていない終了記号(])はスキップします。\n";
+				}
+				else {
+					m_tracks[m_trackNo].recChordEnd();
+					m_chordStart = 0;
+				}
 				break;
 			case ';': // end of track
 				if (m_tracks[m_trackNo].getNumEvents() > 0) {
@@ -1545,7 +1598,7 @@
 			m_pwmNum   = DEF_PWMNUM;
 			m_pwmDenom = DEF_PWMDNM;
 			m_noiseModDest = DEF_NZMOD;
-			m_delayCountMax = 0;		//ディレイエフェクトの最大サンプル数。０でディレイ無効。
+			m_delayCountMax = 0;
 			
 			m_octave = 4;
 			m_noteShift = 0;
@@ -1553,6 +1606,7 @@
 			m_detuneReso = DEF_DETUNE_RESO;
 			m_beforeNote = 0;
 			m_portamento = 0;
+			m_chordStart = 0;
 			
 			m_VscaleMax = DEF_VSMAX;
 			m_VscaleRate = DEF_VSRATE;
@@ -1564,9 +1618,9 @@
 			m_volumeCalcPriority = DEF_VOLCULCPR;
 			m_volumeRoundMode = DEF_VOLROUNDM;
 			
-			m_AEnvLvRdMode = 0;			//音量ENVレベルの丸めモード。0 は滑らかモード。
-			m_AEnvLvDenom = 0.0;		//音量ENVレベルの分母指定。0.0 は特例で分母にm_VXscaleMaxを採用するモード。
-			m_AEnvLvOffset = 0.0;		//音量ENVレベルへのオフセット。
+			m_AEnvLvRdMode = 0;
+			m_AEnvLvDenom = 0.0;
+			m_AEnvLvOffset = 0.0;
 		}
 		public function createTrack():MTrack {
 			initMMLvariable();
@@ -2235,6 +2289,78 @@
 					}
 				}
 				fms = null;
+			}
+
+			// FMFBBIAS :FM Feedback Level BIAS
+			{
+				//デフォルト設定
+				MOscOPMS.s_FbLvBIAS = 1.0;
+				
+				matched = findMetaDescV("FMFBBIAS");
+				if (matched.length > 0) {
+					s = String(matched[0]);
+					s = s.replace(/\s+/gm, "");
+					if (s.length > 0) {
+						n = Number(s);
+						if ((n >= MOscOPMS.FBBIASMIN) && (n <= MOscOPMS.FBBIASMAX)) {
+							MOscOPMS.s_FbLvBIAS = n;
+							i = 0;
+						}
+						else { i = (-1); }
+					}
+					else { i = (-1); }
+					if (i < 0) {
+						m_warning += "#FMFBBIASの設定が規定範囲外のため、既定 1.0 から変更しません。(" + s + ")\n";
+					}
+				}
+			}
+
+			// FMHLFOS1 :FM Hard LFO Speed adjust for OPM-MODE
+			{
+				//デフォルト設定
+				MOscOPMS.s_HLFO_OPMSP = 1.0;
+				
+				matched = findMetaDescV("FMHLFOS1");
+				if (matched.length > 0) {
+					s = String(matched[0]);
+					s = s.replace(/\s+/gm, "");
+					if (s.length > 0) {
+						n = Number(s);
+						if ((n >= MOscOPMS.HLFOSPMIN) && (n <= MOscOPMS.HLFOSPMAX)) {
+							MOscOPMS.s_HLFO_OPMSP = n;
+							i = 0;
+						}
+						else { i = (-1); }
+					}
+					else { i = (-1); }
+					if (i < 0) {
+						m_warning += "#FMHLFOS1の設定が規定範囲外のため、既定 1.0 から変更しません。(" + s + ")\n";
+					}
+				}
+			}
+
+			// FMHLFOS2 :FM Hard LFO Speed adjust for OPNA-MODE
+			{
+				//デフォルト設定
+				MOscOPMS.s_HLFO_OPNASP = 1.0;
+				
+				matched = findMetaDescV("FMHLFOS2");
+				if (matched.length > 0) {
+					s = String(matched[0]);
+					s = s.replace(/\s+/gm, "");
+					if (s.length > 0) {
+						n = Number(s);
+						if ((n >= MOscOPMS.HLFOSPMIN) && (n <= MOscOPMS.HLFOSPMAX)) {
+							MOscOPMS.s_HLFO_OPNASP = n;
+							i = 0;
+						}
+						else { i = (-1); }
+					}
+					else { i = (-1); }
+					if (i < 0) {
+						m_warning += "#FMHLFOS2の設定が規定範囲外のため、既定 1.0 から変更しません。(" + s + ")\n";
+					}
+				}
 			}
 
 			//                                       No/CharW/bitW

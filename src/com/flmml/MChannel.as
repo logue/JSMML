@@ -2,8 +2,8 @@
 	import __AS3__.vec.Vector;
 
 	public class MChannel implements IChannel {
-		public static const  NOTE_LIMIT_MAX:int     = 120;			//o10c 以下のノートにする。o4a=440Hzのときo10c=16.7kHz
-		public static const  NOTE_LIMIT_MIN:int     = (-3);			//o(-1)a 以上のノートにする。o4a=440Hzのときo(-1)a=13.75Hz
+		public static const  NOTE_LIMIT_MAX:Number  = 120.0;		//o10c 以下のノートにする。o4a=440Hzのときo10c=16.7kHz
+		public static const  NOTE_LIMIT_MIN:Number  = (-12.0);		//o(-1)c 以上のノートにする。o4a=440Hzのときo(-1)c=8.1758Hz
 		public static var    s_BaseNote:Number      = 57.0;			//基準になる音階。o0c=0,o4c=48,o4a=57。メタデータから取得
 		public static var    s_BaseFreq:Number      = 440.0;		//基準音階にあてがう周波数をいくつにするか。メタデータから取得
 		public static var    s_LFOclockMode:Boolean = true;			//default:true。trueのとき、s_LFOclockは1tick（テンポ依存）。falseのとき、s_LFOclockは固定時間。
@@ -25,10 +25,10 @@
 		private static const ENV_F_TRIGGER_FIL:int    = 0x00000010;
 		private static const ENV_F_TRIGGER_PWM:int    = 0x00000100;
 
-		private var m_pitchReso:int;			// 音程の分解能。100のとき分解能１セント
+		private var m_pitchReso:Number;			// 音程の分解能。半音を何分割にするかの数
 		private var m_noteNo:int;
-		private var m_detune:int;
-		private var m_freqNo:int;
+		private var m_detune:Number;
+		private var m_freqNo:Number;
 		private var m_envForceTrigger:int;
 		private var m_envelope1:MEnvelope;		// for Amplitude
 		private var m_envelope2:MEnvelope;		// for Filter
@@ -101,15 +101,15 @@
 		private var m_portDepthAdd:Number;
 		private var m_portamento:int;
 		private var m_portRate:Number;
-		private var m_lastFreqNo:int;
+		private var m_lastFreqNo:Number;
 
-		private var m_voiceid:Number;		// ボイスID for Poly
+		private var m_voiceid:int;			// ボイスID for Poly
 
 		public function MChannel() {
 			m_pitchReso = MML.DEF_DETUNE_RESO;
 			m_noteNo = 0;
-			m_detune = 0;
-			m_freqNo = 0;
+			m_detune = 0.0;
+			m_freqNo = 0.0;
 			// env1:amp, env2:filter, env3:pwm
 			m_envelope1 = new MEnvelope(1, 1.0,1.0, 180.0,0.0, 1.0,0.0);
 			m_envelope2 = new MEnvelope(2, 1.0,1.0, 120.0,0.0, 1.0,0.0);
@@ -184,7 +184,7 @@
 			resetParam();
 		}
 		public function resetParam():void {
-			m_voiceid = 0.0;
+			m_voiceid = 0;
 			setFormDirect(MML.DEF_FORM, MML.DEF_SUBFORM);
 			setPWM(0.5, 0);
 			setDetune(0, MML.DEF_DETUNE_RESO);
@@ -211,11 +211,11 @@
 			setLPF(0, m_lpfInit);
 			setFormant(-1);
 			// ポルタメント
-			m_portDepth     = 0;
-			m_portDepthAdd  = 0;
-			m_lastFreqNo    = 4800;
+			m_portDepth     = 0.0;
+			m_portDepthAdd  = 0.0;
+			m_lastFreqNo    = 0.0;
 			m_portamento    = 0;
-			m_portRate      = 0;
+			m_portRate      = 0.0;
 			// エフェクト
 			setFade(1.0, 0.0, -1);		//mode:-1（フェード無効）
 		}
@@ -223,8 +223,8 @@
 			s_samples = new Vector.<Number>(numSamples);
 			s_samples.fixed = true;
 		}
-		public function getFrequency(freqNo:int):Number {
-			var freqIdx:int = freqNo;
+		public function getFrequency(freqNo:Number):Number {
+			var freqIdx:Number = freqNo;
 			var freq:Number;
 			if (freqIdx < (NOTE_LIMIT_MIN * m_pitchReso)) {
 				freqIdx = (NOTE_LIMIT_MIN * m_pitchReso);
@@ -232,12 +232,12 @@
 			else if (freqIdx > (NOTE_LIMIT_MAX * m_pitchReso)) {
 				freqIdx = (NOTE_LIMIT_MAX * m_pitchReso);
 			}
-			freq = s_BaseFreq * Math.pow(2.0, ( (Number(freqIdx) - (s_BaseNote * Number(m_pitchReso))) / (12.0 * Number(m_pitchReso)) ) );
+			freq = s_BaseFreq * Math.pow(2.0, ( (freqIdx - (s_BaseNote * m_pitchReso)) / (12.0 * m_pitchReso) ) );
 			return freq;
 		}
 		private function setPitchResolution(reso:int):void {
 			if ((reso >= 10) && (reso <= 1000)) {
-				m_pitchReso = reso;
+				m_pitchReso = Number(reso);
 			}
 		}
 		public function isPlaying():Boolean {
@@ -248,13 +248,13 @@
 				return m_envelope1.isPlaying();
 			}
 		}
-		public function getId():Number {
+		public function getId():int {
 			return m_voiceid;
 		}
 		public function getVoiceCount():int {
 			return isPlaying() ? 1 : 0;
 		}
-		public function noteOnWidthId(noteNo:int, id:Number, pdif:uint):void {
+		public function noteOnWidthId(noteNo:int, id:int, pdif:uint):void {
 			m_voiceid = id;
 			noteOn(noteNo,pdif);
 		}
@@ -312,25 +312,26 @@
 			setEnvForceTrigger();
 
 			m_noteNo = noteNo;
-			m_freqNo = m_noteNo * m_pitchReso + m_detune;
+			m_freqNo = (Number(m_noteNo) * m_pitchReso) + m_detune;
 			m_oscMod1.setFrequency(getFrequency(m_freqNo));
 
 			if (m_portamento == 1) {
 				if (!tie) {
-					m_portDepth = m_lastFreqNo - m_freqNo;
+					m_portDepth = (m_lastFreqNo - m_freqNo);
 				}
 				else {
 					m_portDepth += (m_lastFreqNo - m_freqNo);
 				}
-				m_portDepthAdd = (m_portDepth < 0.0) ? m_portRate : m_portRate * -1.0;
+				m_portDepthAdd = (m_portDepth < 0.0) ? m_portRate : (m_portRate * (-1.0));
 			}
 			m_lastFreqNo = m_freqNo;
 		}
-		public function setDetune(detune:int, rate:int):void {
+		public function setDetune(detune:Number, rate:int):void {
 			m_detune = detune;
 			setPitchResolution(rate);
-			m_freqNo = (m_noteNo * m_pitchReso) + m_detune;
+			m_freqNo = (Number(m_noteNo) * m_pitchReso) + m_detune;
 			m_oscMod1.setFrequency(getFrequency(m_freqNo));
+			// m_freqNo に制限は掛けないが、getFrequency(m_freqNo) で得られる周波数には最大最小制限が掛かる
 		}
 		public function getNoteNo():int {
 			return m_noteNo;
@@ -357,9 +358,11 @@
 			}
 		}
 		public function setMixingVolume(m_vol:Number):void {
-			if (m_vol > 12.0) m_vol = 12.0;			//利得12dBまで。
+			var val:Number = m_vol;
 			if (m_vol > (-100.0)) {
-				m_mix_volume = Math.pow(10.0, (m_vol / 20.0));
+				if (m_vol > 24.0) { val = 24.0;  }		//利得24dBまで。
+				else              { val = m_vol; }
+				m_mix_volume = Math.pow(10.0, (val / 20.0));
 			}
 			else {
 				//-100.0dB以下の指定は無音とみなす
@@ -775,6 +778,7 @@
 			}
 		}
 		public function setOPMHwLfo(data:int):void {
+			var hmd:int = (data>>30) & 0x01;
 			var w:int   = (data>>28) & 0x03;
 			var f:int   = (data>>20) & 0x0FF;
 			var pmd:int = (data>>13) & 0x7F;
@@ -783,31 +787,44 @@
 			var ams:int = (data>> 1) & 0x03;
 			var syn:int = (data    ) & 0x01;
 			var fms:MOscOPMS = ((MOscOPMS)(m_oscSet1.getMod(MOscillator.OPMS)));
-			fms.setWF(w);
-			fms.setLFRQ(f);
-			fms.setPMD(pmd);
-			fms.setAMD(amd);
-			fms.setPMSAMS( ((pms<<4)|ams) );
-			fms.setSYNC(syn);
+			fms.setHLFOMODE(hmd);
+			if (hmd == 0) {
+				fms.setWF(w);
+				fms.setLFRQ(f);
+				fms.setPMD(pmd);
+				fms.setAMD(amd);
+				fms.setPMSAMS( ((pms<<4)|ams) );
+				fms.setSYNC(syn);
+			}
+			else {
+				fms.setLFRQa(f);
+				fms.setAMSPMSa( ((ams<<4)|pms) );
+				fms.setSYNCa(syn);
+			}
 		}
 		public function setYControl(m:int, f:int, n:Number):void {
 			if ((m >= 0) && (m < MOscillator.MAX)) {
 				(m_oscSet1.getMod(m)).setYControl(m,f,n);
 			}
 		}
-		public function setPortamento(depth:int, len:Number):void {
+		public function setPortamento(depth:Number, len:Number):void {
 			m_portamento = 0;
 			m_portDepth = depth;
-			m_portDepthAdd = (Number(m_portDepth) / len) * -1;
+			m_portDepthAdd = (m_portDepth / len) * (-1.0);		//ポルタメント終了まで m_portDepth * m_portDepthAdd は負数
 		}
 		public function setMidiPort(mode:int):void {
 			m_portamento = mode;
-			m_portDepth = 0;
+			m_portDepth = 0.0;
 		}
-		public function setMidiPortRate(rate:Number):void {
-			m_portRate = rate;
+		public function setMidiPortRate(rate:int):void {
+			if (rate > 0) {
+				m_portRate = (8.0 - (Number(rate) * 7.99 / 128.0)) / Number(rate);
+			}
+			else {
+				m_portRate = 0.0;
+			}
 		}
-		public function setPortBase(base:int):void {
+		public function setPortBase(base:Number):void {
 			m_lastFreqNo = base;
 		}
 		public function setVoiceLimit(voiceLimit:int) : void {
@@ -914,7 +931,7 @@
 			var trackBuffer:Vector.<Number> = s_samples;
 			var playing:Boolean = isPlaying();
 			var tmpFlag:Boolean;
-			var freqNo:int;
+			var freqNo:Number;
 			var depth:Number, depth2:Number;
 			var vol:Number, Vscale:Number, Vrate:Number;
 			var lpffrq:Number;
@@ -931,7 +948,7 @@
 				var modP:MOscPulse = (MOscPulse)(m_oscSet1.getMod(MOscillator.PULSE));
 				var modY:MOscMod   = m_oscSet1.getMod(m_lfoYfuncMod);
 				if (
-					(m_portDepth != 0) ||
+					(m_portDepth != 0.0) ||
 					(m_oscLConnect[LFO_TARGET_PITCH] != 0) ||
 					(m_oscLConnect[LFO_TARGET_YCONTROL] != 0) ||
 					(m_env3Connect == true)
@@ -946,14 +963,14 @@
 						if (e > end) e = end;
 						//for pitch
 						freqNo = m_freqNo;
-						if (m_portDepth != 0) {
+						if (m_portDepth != 0.0) {
 							freqNo += m_portDepth;
-							m_portDepth += (m_portDepthAdd * (e - s - 1));
-							if (m_portDepth * m_portDepthAdd > 0) m_portDepth = 0;
+							m_portDepth += (m_portDepthAdd * Number(e - s - 1));
+							if ((m_portDepth * m_portDepthAdd) > 0.0) m_portDepth = 0.0;
 						}
 						if (m_oscLConnect[LFO_TARGET_PITCH] != 0) {
 							if (onCounter >= m_lfoDelay[LFO_TARGET_PITCH]) {
-								freqNo += int(m_oscModL[LFO_TARGET_PITCH].getNextSample() * depth);
+								freqNo += (m_oscModL[LFO_TARGET_PITCH].getNextSample() * depth);
 								m_oscModL[LFO_TARGET_PITCH].addPhase(e - s - 1);
 							}
 						}

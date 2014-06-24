@@ -50,8 +50,8 @@
 		public function setNote(noteNo:int):void {
 			set(MStatus.NOTE,          noteNo, 0, 0.0, null);
 		}
-		public function setDetune(d:int, r:int):void {
-			set(MStatus.DETUNE,        d, r, 0.0, null);
+		public function setDetune(d:Number, r:int):void {
+			set(MStatus.DETUNE,        r, 0, d, null);
 		}
 		public function setMixingVolume(m_vol:Number):void {
 			set(MStatus.MIXING_VOL,    0, 0, m_vol, null);
@@ -143,8 +143,8 @@
 		public function getTick():uint				{ return m_tick;  }
 		public function getTempo():Number			{ return m_dataN; }
 		public function getNoteNo():int				{ return m_data0; }
-		public function getDetune():int				{ return m_data0; }
-		public function getDetuneRate():int			{ return m_data1; }
+		public function getDetune():Number			{ return m_dataN; }
+		public function getDetuneRate():int			{ return m_data0; }
 		public function getMixingVolume():Number	{ return m_dataN; }
 		public function getVolModeMAX():int			{ return m_data0; }
 		public function getVolModeRate():Number		{ return m_dataN; }

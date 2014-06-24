@@ -8,7 +8,7 @@
 		function noteOn(noteNo:int,pdif:uint):void;
 		function noteOff(noteNo:int):void;
 		function setNoteNo(noteNo:int, tie:Boolean = true):void;
-		function setDetune(detune:int, rate:int):void;
+		function setDetune(detune:Number, rate:int):void;
 		function setEnvTimeUnit(spt:Number):void;
 		function setLfoResolution(spt:Number):void;
 		function setMixingVolume(m_vol:Number):void;
@@ -27,10 +27,10 @@
 		function setPWM(pwm:Number, mode:int):void;
 		function setOPMHwLfo(data:int):void;
 		function setYControl(m:int, f:int, n:Number):void;
-		function setPortamento(depth:int, len:Number):void;
+		function setPortamento(depth:Number, len:Number):void;
 		function setMidiPort(mode:int):void;
-		function setMidiPortRate(rate:Number):void;
-		function setPortBase(base:int):void;
+		function setMidiPortRate(rate:int):void;
+		function setPortBase(base:Number):void;
 		function getVoiceCount():int;
 		function setVoiceLimit(voiceLimit:int):void;
 		function setFade(time:Number, range:Number, mode:int):void;

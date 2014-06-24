@@ -36,5 +36,6 @@
 		public static const CLOSE:int         = 33;
 		public static const SOUND_OFF:int     = 34;
 		public static const RESET_ALL:int     = 35;
+		public static const MAX_STATUS:int    = 36;
 	}
 }

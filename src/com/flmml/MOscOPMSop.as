@@ -139,6 +139,8 @@ package com.flmml {
 		private var Pitch:int;			// 0<=pitch<10*12*64
 		private var Dt1Pitch:Number;	// Step に対する補正量
 		private var Mul:Number;			// 0.5, 1, 2, 3, .., 15
+		private var Dt3:Number;
+		private var MulDt3:Number;
 		private var Tl:int;				// (128 - (n & 127)) << (SIZEALPHATBL_BITS - 7)
 		
 		private var Out2Fb:Number;		// フィードバックへの出力値
@@ -162,8 +164,8 @@ package com.flmml {
 		private var D2r:int;		// 0 <= D2r <= 31
 		private var Rr:int;			// 0 <= Rr <= 15
 		private var Ks:int;			// 0 <= Ks <= 3
-		private var Dt2:int;		// Pitch に対する補正量(0, 384, 500, 608)
 		private var Dt1:int;		// DT1の値(0〜7)
+		private var Dt2:int;		// Pitch に対する補正量(0, 384, 500, 608)
 		
 		private var AI:int;			// Attack時の初期レベル(-1=通常。初期値設定なし。0=レベル最大で初期化。128=レベル最小で初期化。)
 		
@@ -224,7 +226,7 @@ package com.flmml {
 			var octofs:int = (-5);
 			var	notekf:int;
 			var sinsize:Number = Number(SIZESINTBL);
-			var fSAM:Number = Number(MOscOPMS.s_Samprate);
+			var fSAM:Number = MOscOPMS.s_SamprateN;
 			STEPTBL = new Vector.<Number>(16*12*64);
 			for (oct=(-2); oct<=13; ++oct) {
 				// オクターブごとに c+ から >c までの 64分割スケール のΔtテーブルを作成
@@ -241,7 +243,7 @@ package com.flmml {
 				}
 			}
 			//DT1テーブル作成
-			var dfs:Number = MOscOPMS.s_OpmRateN / Number(MOscOPMS.s_Samprate);
+			var dfs:Number = MOscOPMS.s_OpmRateN / MOscOPMS.s_SamprateN;
 			var dtofs:Number = Math.pow(2.0, Number(SIZESINTBL_BITS - 20) ) * dfs;
 			DT1TBL  = new Vector.<Number>(128);
 			for (i=0; i<128; ++i) {
@@ -276,6 +278,8 @@ package com.flmml {
 			Xr_el = ELMIN;
 			Xr_step = 0;
 			Mul = 1.0;
+			Dt3 = 1.0;
+			MulDt3 = Mul * Dt3;
 			Ame = 0;
 			
 			AI = (-1);
@@ -403,14 +407,16 @@ package com.flmml {
 			if ((Dt1 & 0x04) != 0) {
 				Dt1Pitch = Dt1Pitch * (-1.0);
 			}
+			Dt1Pitch = Dt1Pitch * Mul;
 		}
 		
-		public function SetFL(n:Number):void {
-			if (n <= 0.0 || n > 8.0) {
+		public function SetFL(n:Number, bias:Number):void {
+			if (n <= 0.0) {
 				Fl = 0.0;
-			} else {
+			}
+			else {
 				//7->2^(-2), 6->2^(-3), 5->2^(-4), 4->2^(-5), 3->2^(-6), 2->2^(-7), 1->2^(-8), 0->0
-				Fl = Math.pow(2.0, Number(n - 9.0));
+				Fl = bias * Math.pow(2.0, Number(n - 9.0));
 			}
 		}
 		
@@ -439,12 +445,11 @@ package com.flmml {
 			if (n <= 0.0) {
 				Mul = 0.5;
 			}
-			else if (n > 16.0) {
-				Mul = 16.0;
-			}
 			else {
 				Mul = n;
 			}
+			MulDt3 = Mul * Dt3;
+			CulcDt1Pitch();
 			LfoPitch = CULC_DELTA_T;
 		}
 		
@@ -481,6 +486,12 @@ package com.flmml {
 		public function SetDT2(n:int):void {
 			Dt2 = DT2TBL[(n & 3)];
 			CulcPitch();
+			LfoPitch = CULC_DELTA_T;
+		}
+		
+		public function SetDT3(n:Number):void {
+			Dt3 = n;
+			MulDt3 = Mul * Dt3;
 			LfoPitch = CULC_DELTA_T;
 		}
 		
@@ -634,7 +645,7 @@ package com.flmml {
 				//DeltaT = ((STEPTBL[Pitch+lfopitch]+Dt1Pitch)*Mul)>>1;
 				//DeltaT = ((STEPTBL[Pitch+lfopitch]+Dt1Pitch)*Mul)>>(6+1);
 				//Pitch+lfopitchの範囲制限はテーブル領域の拡大にて代用（要テーブルサイズ確認）
-				DeltaT = ( (STEPTBL[Pitch+lfopitch] + Dt1Pitch) * Mul );
+				DeltaT = ( (STEPTBL[Pitch+lfopitch] * MulDt3) + Dt1Pitch );
 				LfoPitch = lfopitch;
 			}
 			//T = (T + DeltaT) & MASKPHASE;

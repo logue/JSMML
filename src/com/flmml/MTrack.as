@@ -30,7 +30,7 @@
 		private var m_isEnd:int;
 		private var m_globalTick:uint;
 		private var m_signalCnt:int;
-		private var m_pitchReso:int;
+		private var m_pitchReso:Number;
 		private var m_totalMSec:uint;
 		private var m_noteOnPos:uint;
 		private var m_noteOffPos:uint;
@@ -128,8 +128,10 @@
 								m_ch.setNoteNo(e.getNoteNo());
 								break;
 							case MStatus.DETUNE:
-								var dtrate:int = e.getDetuneRate();
-								if ((dtrate >= 10) && (dtrate <= 1000)) m_pitchReso = dtrate;
+								var dtrate:Number = e.getDetuneRate();
+								if ((dtrate >= 10.0) && (dtrate <= 1000.0)) {
+									m_pitchReso = dtrate;
+								}
 								m_ch.setDetune(e.getDetune(), e.getDetuneRate());
 								break;
 							case MStatus.MIXING_VOL:
@@ -182,17 +184,16 @@
 								m_ch.setYControl(e.getYCtrlMod(), e.getYCtrlFunc(), e.getYCtrlParam());
 								break;
 							case MStatus.PORTAMENTO:
-								m_ch.setPortamento(e.getPorDepth() * m_pitchReso, e.getPorLen() * m_spt);
+								m_ch.setPortamento(Number(e.getPorDepth()) * m_pitchReso, Number(e.getPorLen()) * m_spt);
 								break;
 							case MStatus.MIDIPORT:
 								m_ch.setMidiPort(e.getMidiPort());
 								break;
 							case MStatus.MIDIPORTRATE:
-								var rate:Number = e.getMidiPortRate();
-								m_ch.setMidiPortRate((8 - (rate * 7.99 / 128)) / rate);
+								m_ch.setMidiPortRate(e.getMidiPortRate());
 								break;
 							case MStatus.BASENOTE:
-								m_ch.setPortBase(e.getPortBase() * m_pitchReso);
+								m_ch.setPortBase(Number(e.getPortBase()) * m_pitchReso);
 								break;
 							case MStatus.POLY:
 								m_ch.setVoiceLimit(e.getVoiceCount());
@@ -496,7 +497,7 @@
 			m_gate_ticks2 = gate2;
 		}
 
-		public function recDetune(d:int, r:int):void {
+		public function recDetune(d:Number, r:int):void {
 			var e:MEvent = makeEvent();
 			e.setDetune(d,r);
 			pushEvent(e);
@@ -600,10 +601,19 @@
 			pushEvent(e);
 		}
 
-		public function recOPMHwLfo(wf:int, freq:int, pmd:int, amd:int, pms:int, ams:int, syn:int):void {
+		public function recOPMHwLfo(hmode:int, wf:int, freq:int, pmd:int, amd:int, pms:int, ams:int, syn:int):void {
 			var e:MEvent = makeEvent();
 			var params:int;
-			params = ((wf & 3) << 28) | ((freq & 0x0ff) << 20) | ((pmd & 0x7f) << 13) | ((amd & 0x7f) << 6) | ((pms & 7) << 3) | ((ams & 3) << 1) | (syn & 1);
+			params = 
+				((hmode & 1) << 30) |
+				((wf & 3) << 28) |
+				((freq & 0x0ff) << 20) |
+				((pmd & 0x7f) << 13) |
+				((amd & 0x7f) << 6) |
+				((pms & 7) << 3) |
+				((ams & 3) << 1) |
+				(syn & 1)
+				;
 			e.setOPMHwLfo(params);
 			pushEvent(e);
 		}

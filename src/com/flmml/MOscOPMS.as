@@ -11,22 +11,30 @@ package com.flmml {
 		private static const OP1:int = 0,  OP2:int = 1,  OP3:int = 2,  OP4:int = 3;
 		private static const OPMAX:int = 4;
 		private static const PARAMAX:int = 61;
-		public  static const NOTEOFS:int = (1100 + 2400);		//オクターブ拡張補正込み
+		public  static const OPMCLK358:Number = (3579545.0);
+		public  static const OPNACLK39936:Number = (3993600.0);
+		public  static const CLOCK4M:Number = (4000000.0);
+		public  static const NOTEOFS:int = ((11 + 24) * 64);	//オクターブ拡張補正込み
 		private static const DT3MAX:Number = (3600.0);
 		private static const DT3MIN:Number = (-3600.0);
-		private static var m_letter:int;						//音色テキスト数値解析用インデックス
-		private static var m_string:String;						//音色テキスト数値解析用文字列
+		public  static const FBBIASMAX:Number = (1.25);
+		public  static const FBBIASMIN:Number = (0.925);
+		public  static const HLFOSPMAX:Number = (2.0);
+		public  static const HLFOSPMIN:Number = (0.5);
 		
+		private static var s_letter:int;						//音色テキスト数値解析用インデックス
+		private static var s_string:String;						//音色テキスト数値解析用文字列
 		private static var s_ToneTable:Vector.<Vector.<Number>>;
 		private static var s_ofs:Vector.<int> = Vector.<int>([1,16,31,46]);
 		private static var s_of2:Vector.<int> = Vector.<int>([2,13,24,35]);
 		
-		public  static var s_OpmRateN:Number = (3579545.0 / 64.0);	// テーブル計算用。入力クロック÷64
-		public  static var s_OpmRate:int = int(Math.round(s_OpmRateN));
-		public  static var s_SamprateN:int = 44100.0;
-		public  static var s_Samprate:int = 44100;
-		private static var s_ClkRatio:Number;
+		public  static var s_OpmClock:Number = (OPMCLK358);
+		public  static var s_OpmRateN:Number = (OPMCLK358 / 64.0);	// テーブル計算用。入力クロック÷64
+		public  static var s_SamprateN:Number = (44100.0);
 		private static var s_LvOfs:Number = Math.pow(2.0, Number(MOscOPMSop.SIZESINTBL_BITS + 2));			//2^x,  x = SIZESINTBL_BITS + 2
+		public  static var s_FbLvBIAS:Number = (1.0);				//Feedback Level BIAS（メタ指定のデフォルト用）
+		public  static var s_HLFO_OPMSP:Number = (1.0);				//Hard LFO Speed Adj.（メタ指定のデフォルト用）
+		public  static var s_HLFO_OPNASP:Number = (1.0);			//Hard LFO Speed Adj.（メタ指定のデフォルト用）
 		
 		private static var s_KCtable:Vector.<int> = Vector.<int>([
 		//  C   C#  D   D#  E   F   F#  G   G#  A   A#  B
@@ -71,6 +79,10 @@ package com.flmml {
 		private var m_curTone:int;			// カレント音色番号
 		private var m_KeyOn:Boolean;
 		private var m_EgResetMode:Boolean;
+		private var m_FbLvBIAS:Number;		//Feedback Level BIAS（逐次指定のY-control用）
+		private var m_HLFO_OPMSP:Number;	//Hard LFO Speed Adj.（逐次指定のY-control用）
+		private var m_HLFO_OPNASP:Number;	//Hard LFO Speed Adj.（逐次指定のY-control用）
+		
 		private var m_ampLV:Number;			// 音量レベル（シーケンサ側からの指示）
 		private var m_outputLV:Number;		// 出力レベル（s_gainLV * m_ampLV * 整数pcmからfloatへの変換値）
 		private var m_OpOut:Number;
@@ -90,9 +102,15 @@ package com.flmml {
 		private var m_rate:Number;
 		
 		private var lfo:MOscOPMSlfo;
+		private var lfoA:MOscOPMSlfoA;
+		private var m_lfoUpdate:Function;
+		private var m_lfoGetPMV:Function;
+		private var m_lfoGetAMV:Function;
+		private var m_lfoGetSYNC:Function;
+		private var m_lfoResetPhase:Function;
 		private var m_lfopitch:int;
 		private var m_lfolevel:int;
-		private var m_lfoSync:Boolean;
+		private var m_lfoMode:Boolean;
 		
 		public function MOscOPMS() {
 			boot();
@@ -105,12 +123,17 @@ package com.flmml {
 			OP[OP3] = new MOscOPMSop();
 			OP[OP4] = new MOscOPMSop();
 			lfo = new MOscOPMSlfo();
+			lfoA = new MOscOPMSlfoA();
 			m_Y_DT3 = Vector.<Number>([0.0, 0.0, 0.0, 0.0]);
 			m_Y_TL  = Vector.<int>([0, 0, 0, 0]);
+			m_FbLvBIAS = s_FbLvBIAS;	// メタ指定のデフォルト値を受け取る
+			m_HLFO_OPMSP = s_HLFO_OPMSP;
+			m_HLFO_OPNASP = s_HLFO_OPNASP;
 			setVolume(1.0);				// m_ampLV,m_outputLVの初期設定
 			Reset();
 			setWaveNo(0);				// boot()で定義されたデフォルト音色を音源に設定。
 			m_compleCount = 0;
+			setHLFOMODE(0);				// OPM mode
 			
 			super();
 		}
@@ -120,19 +143,13 @@ package com.flmml {
 			s_ToneTable = new Vector.< Vector.<Number> >(MAX_TONE);
 			s_ToneTable.fixed = true;
 			s_ToneTable[0] = defaultOPMS_Tone;
-			SetOpmClock(3579545.0);
+			SetOpmClock(OPMCLK358);
 			// -----
 			s_init = 1;
 		}
 		public static function SetOpmClock(val:Number):void {
-			var rate:Number;
-			rate = val / 64.0;
-			s_OpmRateN = rate;
-			s_OpmRate = int(Math.round(rate));
-			rate = val;
-			if (rate < 3579545.0) rate = 3579545.0;
-			if (rate > 4000000.0) rate = 4000000.0;
-			s_ClkRatio = 1200.0 * Math.log(3579545.0/rate)/Math.log(2.0);
+			s_OpmClock = limitNum(OPMCLK358, CLOCK4M, val);
+			s_OpmRateN = s_OpmClock / 64.0;
 		}
 		// 動作モード初期化
 		public function Reset():void {
@@ -151,8 +168,8 @@ package com.flmml {
 			m_EnvCounter1 = 0;
 			m_EnvCounter2 = 3;
 			// LFO初期化
-			lfo.Init(s_OpmRate);
-			setSYNC(0);
+			lfo.Init(s_OpmRateN * m_HLFO_OPMSP);
+			lfoA.Init((OPNACLK39936 / 72.0) * m_HLFO_OPNASP);
 		}
 		// パラメータの最小値・最大値のリミッタ機能
 		private static function limitNum(l1:Number, l2:Number, num:Number):Number {
@@ -168,16 +185,16 @@ package com.flmml {
 			if (n > l2) n = l2;
 			return n;
 		}
-		//テキスト数値読み取り関数(要:m_string,m_letter)：getChar(),next(),getUint(),getUNumber()
+		//テキスト数値読み取り関数(要:s_string,s_letter)：getChar(),next(),getUint(),getUNumber()
 		private static function getChar():String {
-			return (m_letter < m_string.length) ? m_string.charAt(m_letter) : '';
+			return (s_letter < s_string.length) ? s_string.charAt(s_letter) : '';
 		}
 		private static function next(i:int = 1):void {
-			m_letter += 1;
+			s_letter += 1;
 		}
 		private static function getUInt(def:int):int {
 			var ret:int = 0;
-			var l:int = m_letter;
+			var l:int = s_letter;
 			var f:Boolean = true;
 			while(f) {
 				var c:String = getChar();
@@ -195,13 +212,13 @@ package com.flmml {
 					default: f = false; break;
 				}
 			}
-			return (m_letter == l) ? def : ret;
+			return (s_letter == l) ? def : ret;
 		}
 		private static function getUNumber(def:Number):Number {
 			var ret:Number;
 			var l:int;
 			var d:Number = 1.0;
-			l = m_letter;
+			l = s_letter;
 			ret = Number( getUInt(0) );
 			if (getChar() == '.') {
 				next();
@@ -224,14 +241,14 @@ package com.flmml {
 					}
 				}
 			}
-			return (m_letter == l) ? def : ret;
+			return (s_letter == l) ? def : ret;
 		}
 		//正の分数テキストを読み取って実数を返す関数
 		private static function getUFraction(s:String):Number {
 			var n1:Number, n2:Number;
 			var f:Boolean;
-			m_letter = 0;
-			m_string = s.replace(new RegExp("[ 　\n\r\t\f]+","g"),"");
+			s_letter = 0;
+			s_string = s.replace(new RegExp("[ 　\n\r\t\f]+","g"),"");
 			n1 = getUNumber(-1.0);
 			if (n1 == (-1.0)) return 1.0;		//error終了
 			if (getChar() == '/') {
@@ -352,13 +369,13 @@ package com.flmml {
 				setD1L( i, int(t[ 4 + s_ofs[i] ]));
 				setTL(  i, int(t[ 5 + s_ofs[i] ]));
 				setKS(  i, int(t[ 6 + s_ofs[i] ]));
-				setMUL_DT3( i, t[ 7 + s_ofs[i] ], t[13 + s_ofs[i] ]);
+				setMUL( i,     t[ 7 + s_ofs[i] ] );
 				setDT1( i, int(t[ 8 + s_ofs[i] ]));
 				setDT2( i, int(t[ 9 + s_ofs[i] ]));
 				setAME( i, int(t[10 + s_ofs[i] ]));
 				setMSK( i, int(t[11 + s_ofs[i] ]));
 				setFB(  i,     t[12 + s_ofs[i] ] );
-				//DT3はMULへ統合
+				setDT3( i,     t[13 + s_ofs[i] ] );
 				setAI(  i, int(t[14 + s_ofs[i] ]));
 			}
 			setCON( int(t[ 0]) );
@@ -395,7 +412,7 @@ package com.flmml {
 			}
 		}
 		private function setFB(op:int, val:Number):void {
-			OP[op].SetFL(val);
+			OP[op].SetFL(val, m_FbLvBIAS);
 		}
 		private function setMSK(op:int, val:int):void {
 			if (val != 0) OP[op].SetTL(127);
@@ -421,18 +438,19 @@ package com.flmml {
 		private function setKS(op:int, val:int):void {
 			OP[op].SetKS(val);
 		}
-		private function setMUL_DT3(op:int, val:Number, val2:Number):void {
-			var MulDt3:Number;
-			var DT3:Number;
-			DT3 = limitNum(DT3MIN, DT3MAX, (val2 + m_Y_DT3[op]))
-			MulDt3 = val * (Math.pow(2.0, (DT3/1200.0)));
-			OP[op].SetMUL(MulDt3);
+		private function setMUL(op:int, val:Number):void {
+			OP[op].SetMUL(val);
 		}
 		private function setDT1(op:int, val:int):void {
 			OP[op].SetDT1(val);
 		}
 		private function setDT2(op:int, val:int):void {
 			OP[op].SetDT2(val);
+		}
+		private function setDT3(op:int, val:Number):void {
+			var DT3:Number;
+			DT3 = Math.pow(2.0, (  limitNum(DT3MIN, DT3MAX, (val + m_Y_DT3[op]))  /1200.0));
+			OP[op].SetDT3(DT3);
 		}
 		private function setAME(op:int, val:int):void {
 			OP[op].SetAME(val);
@@ -540,9 +558,9 @@ package com.flmml {
 					OP[OP4].Envelope(m_EnvCounter1);
 				}
 			}
-			lfo.Update();
-			m_lfopitch = lfo.GetPmValue();
-			m_lfolevel = lfo.GetAmValue();
+			m_lfoUpdate();
+			m_lfopitch = m_lfoGetPMV();
+			m_lfolevel = m_lfoGetAMV();
 			OP[OP1].inp = OP[OP2].inp = OP[OP3].inp = OP[OP4].inp = 0;
 			m_getValue();
 			
@@ -579,7 +597,7 @@ package com.flmml {
 				m_rate = 0.0;				//sync note-on: env.render
 				m_EnvCounter2 = 1;			//sync note-on: env.render
 				m_KeyOn = true;
-				if (m_lfoSync == true) lfo.ResetPhase();
+				if (m_lfoGetSYNC() == true) m_lfoResetPhase();
 				{
 					//ノートオン時のプチノイズ軽減
 					var srcV:Number,dstV:Number,diff:Number,a_diff:Number;
@@ -628,32 +646,30 @@ package com.flmml {
 		public override function setFrequency(frequency:Number):void {
 			m_frequency = frequency;
 			m_freqShift = frequency / 44100.0;
-
+			
 			//周波数から音程指示コード、キースケール用コードを生成
-			var n:int, n1:int, n2:int, n3:int, n4:int;
-			var c1:int, c2:int, c3:int, c4:int;
-			var ntkc:int;
+			var n:int;
 			var kc:int;
+			var kskc:int;
+			var nt:int;
+			var note:int;
+			var kf:int;
 			
-			n = int(1200.0 * Math.log(frequency / 440.0) * Math.LOG2E + 5700.0);	//周波数からcent scaleのkey code。（o4a = 5700）
+			n = int(
+					Math.round(   ((12.0 * 64.0) * Math.log(frequency / 440.0) * Math.LOG2E) + (57.0 * 64.0)   )
+				);	//周波数からcent scaleのkey code。（o4a = 57）
 			
-			ntkc = limitNumI(100, 9600, n) / 100;									//o0c+〜o8cの範囲に制限
-			kc = (((ntkc-1)/12) << 4) | s_KCtable[(ntkc+1200) % 12];				//KeyScale用コード。o0c+〜o8cへ変換
+			kc = (limitNumI( ( 1 * 64), ( 96 * 64), n)  /  64);			//o0c+〜o8cの範囲に制限
+			kskc = (((kc-1)/12) << 4) | s_KCtable[(kc+1200) % 12];		//KeyScale用コード。o0c+〜o8cへ変換
 			
-			n = n + NOTEOFS;
-			n1 = limitNumI(2300, 16700, n);					//o(-1)c〜o11c の範囲に制限 (DT3はMULのNumber化によりMUL実装に変更)
-			n2 = limitNumI(2300, 16700, n);
-			n3 = limitNumI(2300, 16700, n);
-			n4 = limitNumI(2300, 16700, n);
-			c1 = int( Math.round( (Number(n1 % 100) / 100.0) * 64.0 ) );
-			c2 = int( Math.round( (Number(n2 % 100) / 100.0) * 64.0 ) );
-			c3 = int( Math.round( (Number(n3 % 100) / 100.0) * 64.0 ) );
-			c4 = int( Math.round( (Number(n4 % 100) / 100.0) * 64.0 ) );
+			nt =  limitNumI( (23 * 64), (167 * 64), (n + NOTEOFS));		//発音用 o(-1)c〜o11c の範囲に制限
+			note = (nt / 64);
+			kf   = (nt % 64);
 			
-			OP[OP1].SetExKCKF((n1/100), kc, c1);
-			OP[OP2].SetExKCKF((n2/100), kc, c2);
-			OP[OP3].SetExKCKF((n3/100), kc, c3);
-			OP[OP4].SetExKCKF((n4/100), kc, c4);
+			OP[OP1].SetExKCKF(note, kskc, kf);
+			OP[OP2].SetExKCKF(note, kskc, kf);
+			OP[OP3].SetExKCKF(note, kskc, kf);
+			OP[OP4].SetExKCKF(note, kskc, kf);
 		}
 		public function resetPhaseExecALLOP():void {
 			if (m_phaseResetPoint >= 0.0) {
@@ -723,6 +739,24 @@ package com.flmml {
 				setAI(OP4, s_ToneTable[m_curTone][60]);
 			}
 		}
+		public function setHLFOMODE(val:int):void {
+			if (val == 0) {
+				m_lfoMode = true;
+				m_lfoUpdate = lfo.Update;
+				m_lfoGetPMV = lfo.GetPmValue;
+				m_lfoGetAMV = lfo.GetAmValue;
+				m_lfoGetSYNC = lfo.GetSyncMode;
+				m_lfoResetPhase = lfo.ResetPhase;
+			}
+			else {
+				m_lfoMode = false;
+				m_lfoUpdate = lfoA.Update;
+				m_lfoGetPMV = lfoA.GetPmValue;
+				m_lfoGetAMV = lfoA.GetAmValue;
+				m_lfoGetSYNC = lfoA.GetSyncMode;
+				m_lfoResetPhase = lfoA.ResetPhase;
+			}
+		}
 		public function setWF(val:int):void {
 			lfo.SetWaveForm(val);
 		}
@@ -739,12 +773,18 @@ package com.flmml {
 			lfo.SetPMSAMS(val);
 		}
 		public function setSYNC(val:int):void {
-			if (val == 0) {
-				m_lfoSync = false;
-			}
-			else {
-				m_lfoSync = true;
-			}
+			if (val == 0) { lfo.SetSYNC(false); }
+			else          { lfo.SetSYNC(true); }
+		}
+		public function setLFRQa(val:int):void {
+			lfoA.SetLFRQ(val);
+		}
+		public function setAMSPMSa(val:int):void {
+			lfoA.SetAMSPMS(val);
+		}
+		public function setSYNCa(val:int):void {
+			if (val == 0) { lfoA.SetSYNC(false); }
+			else          { lfoA.SetSYNC(true); }
 		}
 		
 		public override function setWaveNo(toneNo:int):void {
@@ -758,6 +798,8 @@ package com.flmml {
 		
 		public override function setYControl(m:int, f:int, n:Number):void {
 			var status:Boolean;
+			var value:Number;
+			var i:int;
 			if (m_modID != m) return;
 			switch (f) {
 			default:
@@ -779,85 +821,99 @@ package com.flmml {
 				setOPMEgResetMode(status);
 				break;
 			
+			case 6:		//sp.func.6: OPM Feedback-Level BIAS
+				m_FbLvBIAS = limitNum(FBBIASMIN,FBBIASMAX,n);
+				for (i=0; i<OPMAX; i++) {
+					setFB(i, s_ToneTable[m_curTone][s_ofs[i]+12]);
+				}
+				break;
+			
 			case 10:	//sp.func.10: OP1-OP4 Detune3/TL add.param.reset
-				var i:int;
 				for (i=0; i<OPMAX; i++) {
 					m_Y_DT3[i] = 0.0;
 					m_Y_TL[i]  = 0;
-					setMUL_DT3(i, s_ToneTable[m_curTone][s_ofs[i]+7], s_ToneTable[m_curTone][s_ofs[i]+14]);
-					setTL(i, s_ToneTable[m_curTone][s_ofs[i]+5]);
+					setDT3(i, s_ToneTable[m_curTone][13 + s_ofs[i]]);
+					setTL( i, s_ToneTable[m_curTone][ 5 + s_ofs[i]]);
 				}
 				break;
 			case 11:	//sp.func.11: add OP1-Detune3
 				m_Y_DT3[OP1] = n;
 				//refresh MUL/DT3
-				setMUL_DT3(OP1,
-					s_ToneTable[m_curTone][s_ofs[OP1]+7],
-					s_ToneTable[m_curTone][s_ofs[OP1]+14]
-				);
+				setDT3(OP1, s_ToneTable[m_curTone][13 + s_ofs[OP1]]);
 				break;
 			case 12:	//sp.func.12: add OP1-TL
 				m_Y_TL[OP1] = int(n);
 				//refresh TL
-				setTL(OP1, s_ToneTable[m_curTone][s_ofs[OP1]+5]);
+				setTL(OP1, s_ToneTable[m_curTone][ 5 + s_ofs[OP1]]);
 				break;
 			case 21:	//sp.func.21: add OP2-Detune3
 				m_Y_DT3[OP2] = n;
 				//refresh MUL/DT3
-				setMUL_DT3(OP2,
-					s_ToneTable[m_curTone][s_ofs[OP2]+7],
-					s_ToneTable[m_curTone][s_ofs[OP2]+14]
-				);
+				setDT3(OP2, s_ToneTable[m_curTone][13 + s_ofs[OP2]]);
 				break;
 			case 22:	//sp.func.22: add OP2-TL
 				m_Y_TL[OP2] = int(n);
 				//refresh TL
-				setTL(OP2, s_ToneTable[m_curTone][s_ofs[OP2]+5]);
+				setTL(OP2, s_ToneTable[m_curTone][ 5 + s_ofs[OP2]]);
 				break;
 			case 31:	//sp.func.31: add OP3-Detune3
 				m_Y_DT3[OP3] = n;
 				//refresh MUL/DT3
-				setMUL_DT3(OP3,
-					s_ToneTable[m_curTone][s_ofs[OP3]+7],
-					s_ToneTable[m_curTone][s_ofs[OP3]+14]
-				);
+				setDT3(OP3, s_ToneTable[m_curTone][13 + s_ofs[OP3]]);
 				break;
 			case 32:	//sp.func.32: add OP3-TL
 				m_Y_TL[OP3] = int(n);
 				//refresh TL
-				setTL(OP3, s_ToneTable[m_curTone][s_ofs[OP3]+5]);
+				setTL(OP3, s_ToneTable[m_curTone][ 5 + s_ofs[OP3]]);
 				break;
 			case 41:	//sp.func.41: add OP4-Detune3
 				m_Y_DT3[OP4] = n;
 				//refresh MUL/DT3
-				setMUL_DT3(OP4,
-					s_ToneTable[m_curTone][s_ofs[OP4]+7],
-					s_ToneTable[m_curTone][s_ofs[OP4]+14]
-				);
+				setDT3(OP4, s_ToneTable[m_curTone][13 + s_ofs[OP4]]);
 				break;
 			case 42:	//sp.func.42: add OP4-TL
 				m_Y_TL[OP4] = int(n);
 				//refresh TL
-				setTL(OP4, s_ToneTable[m_curTone][s_ofs[OP4]+5]);
+				setTL(OP4, s_ToneTable[m_curTone][ 5 + s_ofs[OP4]]);
 				break;
 			
-			case 50:	//sp.func.50: HARD LFO wf
+			case 50:	//sp.func.50: HARD LFO mode [OPM/OPNA]
+				setHLFOMODE(int(limitNum(0.0,1.0,n)));
+				break;
+			case 51:	//sp.func.51: OPM HARD LFO wf
 				setWF(int(limitNum(0.0,3.0,n)));
 				break;
-			case 51:	//sp.func.50: HARD LFO lfreq
+			case 52:	//sp.func.52: OPM HARD LFO lfreq
 				setLFRQ(int(limitNum(0.0,255.0,n)));
 				break;
-			case 52:	//sp.func.50: HARD LFO pmd
+			case 53:	//sp.func.53: OPM HARD LFO pmd
 				setPMD(int(limitNum(0.0,127.0,n)));
 				break;
-			case 53:	//sp.func.50: HARD LFO amd
+			case 54:	//sp.func.54: OPM HARD LFO amd
 				setAMD(int(limitNum(0.0,127.0,n)));
 				break;
-			case 54:	//sp.func.50: HARD LFO pms/ams
+			case 55:	//sp.func.55: OPM HARD LFO pms/ams
 				setPMSAMS(int(limitNum(0.0,255.0,n)));
 				break;
-			case 55:	//sp.func.50: HARD LFO sync
+			case 56:	//sp.func.56: OPM HARD LFO sync
 				setSYNC(int(limitNum(0.0,1.0,n)));
+				break;
+			case 57:	//sp.func.57: OPM Hard LFO Speed adjust
+				m_HLFO_OPMSP = limitNum(HLFOSPMIN, HLFOSPMAX, n);
+				lfo.InitSamprate(s_OpmRateN * m_HLFO_OPMSP);
+				break;
+			case 61:	//sp.func.61: OPNA HARD LFO lfreq
+				setLFRQa(int(limitNum(0.0,7.0,n)));
+				break;
+			case 62:	//sp.func.62: OPNA HARD LFO ams/pms
+				setAMSPMSa(int(limitNum(0.0,255.0,n)));
+				break;
+			case 63:	//sp.func.63: OPNA HARD LFO sync
+				setSYNCa(int(limitNum(0.0,1.0,n)));
+				break;
+			case 64:	//sp.func.64: OPNA Hard LFO Speed adjust
+				m_HLFO_OPNASP = limitNum(HLFOSPMIN, HLFOSPMAX, n);
+				lfoA.InitSamprate((OPNACLK39936 / 72.0) * m_HLFO_OPNASP);
 				break;
 			}
 		}

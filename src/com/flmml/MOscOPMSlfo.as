@@ -2,27 +2,26 @@ package com.flmml {
 	import __AS3__.vec.Vector;
 
 	/**
-	 * FM sound generator 'OPMS' LFO unit
+	 * FM sound generator 'OPMS' LFO unit [mode OPM]
 	 * @author LinearDrive
 	 */
 	public class MOscOPMSlfo {
 		private static var s_init:int = 0;
-		private static var SIZELFOTBL:int = 512;			// 2^9;
-		private static var SIZELFOTBL_BITS:int = 9;
-		private static var LFOPRECISION:int = 4096;			// 2^12;
-		private static var N_CH:int = 8;
-		private static const PMSMUL:Vector.<int> = Vector.<int>([ 0,1,2,4,8,16,32,32 ]);
-		private static const PMSSHL:Vector.<int> = Vector.<int>([ 0,0,0,0,0, 0, 1, 2 ]);
-		private static const AMSADJ:int = (7 - (MOscOPMSop.SIZEALPHATBL_BITS - 10));	//元々10bitからのSIZEALPHATBL_BITS拡張分を補正
+		private static const SIZELFOTBL:int = 512;			// 2^9;
+		private static const SIZELFOTBL_BITS:int = 9;
+		private static const LFOPRECISION:int = 4096;			// 2^12;
+		private static const PMSMUL:Vector.<int> = Vector.<int>([ 0,4,7,13,32,64,256,512 ]);
+		private static const AMSMUL:Vector.<int> = Vector.<int>([ 0,255,510,1020 ]);
+		private static const AMSADJ:int = (MOscOPMSop.SIZEALPHATBL_BITS - 10);	//元々10bitからのSIZEALPHATBL_BITS拡張分を補正
 		private static var PmTbl0:Vector.<int>;
 		private static var PmTbl2:Vector.<int>;
 		private static var AmTbl0:Vector.<int>;
 		private static var AmTbl2:Vector.<int>;
 		
-		private var Pmsmul:int;					// 0, 1, 2, 4, 8, 16, 32, 32
-		private var Pmsshl:int;					// 0, 0, 0, 0, 0,  0,  1,  2
-		private var Ams:int;					// 左シフト回数 31(0), 0(1), 1(2), 2(3)
+		private var Pmsmul:int;					// 0,4,7,13,32,64,256,512
+		private var Amsmul:int;					// 0,255,510,1020
 		private var PmdPmsmul:int;				// Pmd*Pmsmul[]
+		private var AmdAmsmul:int;				// Amd*Amsmul[]
 		private var Pmd:int;
 		private var Amd:int;
 		
@@ -40,20 +39,22 @@ package com.flmml {
 		private var AmTblValue:int;
 		private var PmValue:int;
 		private var AmValue:int;
+		private var SyncMode:Boolean;
+		
+		private var seed:uint;
 		
 		public function MOscOPMSlfo() {
 			boot();
 			
+			Pmd = 0;
+			Amd = 0;
 			Pmsmul = 0;
-			Pmsshl = 0;
-			Ams = 31;
+			Amsmul = 0;
 			PmdPmsmul = 0;
+			AmdAmsmul = 0;
 			
 			PmValue = 0;
 			AmValue = 0;
-				
-			Pmd = 0;
-			Amd = 0;
 			
 			LfoStartingFlag = 0;
 			LfoOverFlow = 0;
@@ -66,7 +67,10 @@ package com.flmml {
 			LfoWaveForm = 0;
 			
 			PmTblValue = 0;
-			AmTblValue = 255;
+			AmTblValue = 256;
+			
+			SyncMode = false;
+			seed = 1;
 		}
 		
 		public static function boot():void {
@@ -81,33 +85,33 @@ package com.flmml {
 			// PM Wave Form 0,3
 			for (i=0; i<=127; ++i) {
 				PmTbl0[i] = i;
-				PmTbl0[i+128] = i-127;
+				PmTbl0[i+128] = i-128;
 				PmTbl0[i+256] = i;
-				PmTbl0[i+384] = i-127;
+				PmTbl0[i+384] = i-128;
 			}
 			// AM Wave Form 0,3
 			for (i=0; i<=255; ++i) {
-				AmTbl0[i] = 255-i;
-				AmTbl0[i+256] = 255-i;
+				AmTbl0[i] = 256-i;
+				AmTbl0[i+256] = 256-i;
 			}
 			
 			// PM Wave Form 2
 			for (i=0; i<=127; ++i) {
 				PmTbl2[i] = i;
-				PmTbl2[i+128] = 127-i;
+				PmTbl2[i+128] = 128-i;
 				PmTbl2[i+256] = -i;
-				PmTbl2[i+384] = i-127;
+				PmTbl2[i+384] = i-128;
 			}
 			// AM Wave Form 2
 			for (i=0; i<=255; ++i) {
-				AmTbl2[i] = 255-i;
+				AmTbl2[i] = 256-i;
 				AmTbl2[i+256] = i;
 			}
 			
 			s_init = 1;
 		}
 		
-		public function Init(n:int):void {
+		public function Init(n:Number):void {
 			InitSamprate(n);
 			
 			LfoSmallCounter = 0;
@@ -117,11 +121,12 @@ package com.flmml {
 			SetPMDAMD(128+0);
 			SetWaveForm(0);
 			SetPMSAMS(0);
+			SetSYNC(false);
 			LfoReset();
 			LfoStart();
 		}
-		public function InitSamprate(n:int):void {
-			LfoTimeAdd = LFOPRECISION * n / MOscOPMS.s_Samprate;
+		public function InitSamprate(n:Number):void {
+			LfoTimeAdd = int(Number(LFOPRECISION) * (n / MOscOPMS.s_SamprateN));
 		}
 		
 		public function LfoReset():void {
@@ -131,8 +136,8 @@ package com.flmml {
 			LfoIdx = 0;
 			
 			CulcTblValue();
-			CulcAllPmValue();
-			CulcAllAmValue();
+			CulcPmValue();
+			CulcAmValue();
 		}
 		public function LfoStart():void {
 			LfoStartingFlag = 1;
@@ -146,7 +151,7 @@ package com.flmml {
 				shift = 1;
 				LfoSmallCounterStep <<= 1;
 			}
-			LfoOverFlow = (8<<shift) * LFOPRECISION;
+			LfoOverFlow = 8 * (1<<shift) * LFOPRECISION;
 			
 			//	LfoTime はリセットされる
 			LfoTime = 0;
@@ -155,28 +160,32 @@ package com.flmml {
 			if ((n & 0x80) != 0) {
 				Pmd = n&0x7F;
 				PmdPmsmul = Pmd * Pmsmul;
-				CulcAllPmValue();
+				CulcPmValue();
 			} else {
 				Amd = n&0x7F;
-				CulcAllAmValue();
+				AmdAmsmul = Amd * Amsmul;
+				CulcAmValue();
 			}
 		}
 		public function SetWaveForm(n:int):void {
 			LfoWaveForm = n&3;
 			
 			CulcTblValue();
-			CulcAllPmValue();
-			CulcAllAmValue();
+			CulcPmValue();
+			CulcAmValue();
 		}
 		public function SetPMSAMS(n:int):void {
 			var pms:int = (n>>4)&7;
 			Pmsmul = PMSMUL[pms];
-			Pmsshl = PMSSHL[pms];
 			PmdPmsmul = Pmd*Pmsmul;
 			CulcPmValue();
 			
-			Ams = ((n&3)-1) & 31;
+			Amsmul = AMSMUL[n&3];
+			AmdAmsmul = Amd*Amsmul;
 			CulcAmValue();
+		}
+		public function SetSYNC(n:Boolean):void {
+			SyncMode = n;
 		}
 		
 		public function Update():void {
@@ -214,15 +223,15 @@ package com.flmml {
 					AmTblValue = AmTbl2[LfoIdx];
 					break;
 				case 3:
-					LfoIdx = int( Math.random() * Number(SIZELFOTBL-1) );
+					LfoIdx = int( (irnd() >> (32 - SIZELFOTBL_BITS)) & 0x1ff );
 					PmTblValue = PmTbl0[LfoIdx];
 					AmTblValue = AmTbl0[LfoIdx];
 					break;
 				}
 				LfoSmallCounter &= 15;
 				
-				CulcAllPmValue();
-				CulcAllAmValue();
+				CulcPmValue();
+				CulcAmValue();
 			}
 		}
 		
@@ -231,6 +240,9 @@ package com.flmml {
 		}
 		public function GetAmValue():int {
 			return AmValue;
+		}
+		public function GetSyncMode():Boolean {
+			return SyncMode;
 		}
 		
 		public function CulcTblValue():void {
@@ -259,27 +271,19 @@ package com.flmml {
 			}
 		}
 		public function CulcPmValue():void {
-			if (PmTblValue >= 0) {
-				PmValue = ((PmTblValue*PmdPmsmul)>>(7+5))<<Pmsshl;
-			} else {
-				PmValue = -( (((-PmTblValue)*PmdPmsmul)>>(7+5))<<Pmsshl );
-			}
+			PmValue = (PmTblValue*PmdPmsmul)/(16256);				//16256=127*128
 		}
 		public function CulcAmValue():void {
-			AmValue = (((AmTblValue*Amd)>>(AMSADJ))<<Ams)&(int(0x7FFFFFFF));		//7-xの-xはSIZEALPHATBL_BITSの拡張分
-		}
-		public function CulcAllPmValue():void {
-			//単チャネルモデルの為
-			CulcPmValue();
-		}
-		public function CulcAllAmValue():void {
-			//単チャネルモデルの為
-			CulcAmValue();
+			AmValue = ((AmTblValue*AmdAmsmul)/(32512))<<AMSADJ;		//32512=127*256
 		}
 		public function ResetPhase():void {
 			LfoTime = 0;
 			LfoSmallCounter = 0;
 			LfoIdx = 0;
+		}
+		private function irnd():uint {
+			seed = (seed * 1566083941) + 1;
+			return seed;
 		}
 	}
 }

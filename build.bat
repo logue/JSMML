@@ -1,0 +1,1 @@
+D:\adobe\flex\bin\amxmlc.bat -default-size 100 200 -default-frame-rate 30 -default-background-color 0xFFFFFF -output ./dist/JSMML_customized.swf src/JSMML.as

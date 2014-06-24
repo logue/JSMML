@@ -61,7 +61,8 @@
 			s_length = new Vector.<int>(MAX_WAVE);
 			s_adpType = new Vector.<int>(MAX_WAVE);
 			s_MSM_DiffLookup = new Vector.<int>(49*16);
-			setWave(0, 11025.0, 57, -1, 0, "8080808080808080");
+			initMSMtable();
+			setWave(0, 11025.0, 48, -1, ADPTYPE_YM, "8080808080808080");
 			s_init = 1;
 		}
 		private static function initMSMtable():void {
@@ -283,6 +284,9 @@
 						m_address = (s_loopPt[m_waveNo] >> 1);
 						m_bit = (s_loopPt[m_waveNo] % 2) * 16;
 						m_length = s_length[m_waveNo] - s_loopPt[m_waveNo];
+					}
+					else {
+						m_wav = 0.0;
 					}
 					m_NextDiff = 0.0;
 				}
