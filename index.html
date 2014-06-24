@@ -11,6 +11,11 @@
 		
 		<div class="container">
 			<div class="header">
+				<div class="pull-right">
+					<a href="https://twitter.com/share" class="twitter-share-button" data-url="https://github.com/logue/JSMML/" data-count="vertical" data-via="logue256" data-lang="ja">ツイート</a>
+					<div class="g-plusone" data-size="tall" data-href="http://logue.github.io/JSMML/"></div>
+					<iframe src="//www.facebook.com/plugins/like.php?href=http%3A%2F%2Flogue.github.io%2FJSMML%2F&amp;width=70&amp;height=65&amp;colorscheme=light&amp;layout=box_count&amp;action=like&amp;show_faces=true&amp;send=true&amp;appId=249014621810580" scrolling="no" frameborder="0" style="border:none; overflow:hidden; width:70px; height:65px;" allowTransparency="true"></iframe>
+				</div>
 				<ul class="nav nav-pills pull-right">
 					<li class="active"><a href="index.html">JSMML Sample</a></li>
 					<li><a href="jsmml_customized.html">JSMML Customized Sample</a></li>
@@ -196,6 +201,11 @@ $(window).unload(function(){
 	mml.destroy();
 });
 
+$.getScript('//connect.facebook.net/ja_JP/all.js#xfbml=1&appId=129144050466298',function(){
+	$('body').append('<div id="fb-root"></div>');
+});
+$.getScript('https://apis.google.com/js/plusone.js');
+$.getScript(('https:' == document.location.protocol ? 'https' : 'http') + '://platform.twitter.com/widgets.js');
 $.getScript(('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js',function(){
 	try {
 		var pageTracker = _gat._getTracker("UA-33600926-1");
