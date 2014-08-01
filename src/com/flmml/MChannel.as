@@ -29,11 +29,13 @@
 		private var m_noteNo:int;
 		private var m_detune:Number;
 		private var m_freqNo:Number;
+
 		private var m_envForceTrigger:int;
 		private var m_envelope1:MEnvelope;		// for Amplitude
 		private var m_envelope2:MEnvelope;		// for Filter
 		private var m_envelope3:MEnvelope;		// for Pulse Width
 		private var m_env3Connect:Boolean;		// PWM envelope : false=disable, true=enable
+		private var m_envLastSPT:Number;
 
 		private var m_oscSet1:MOscillator;		// for playing : wave rendering
 		private var m_oscMod1:MOscMod;
@@ -46,6 +48,17 @@
 		private var m_phaseRMmode:int;
 		private var m_phaseRMphase:Number;
 
+		private var m_LFOclockMode:Boolean;
+		private var m_LFOclockMgnf:Number;
+		private var m_LFOclock:Number;
+		private var m_lfoDeltaMode:Boolean;
+		private var m_lfoDeltaMgnf:Number;
+		private var m_lfoDelta:int;
+		private var m_lfoDelta_rmd:int;
+		private var m_lfoDelta_rmd_F:int;
+		private var m_lfoPitchLastVal:Number;
+		private var m_lfoLastSPT:Number;
+
 		private var m_oscSetL0:MOscillatorL;		// for Pitch LFO
 		private var m_oscSetL1:MOscillatorLA;		// for Amplitude LFO
 		private var m_oscSetL2:MOscillatorL;		// for Filter LFO
@@ -53,6 +66,7 @@
 		private var m_oscSetL4:MOscillatorL;		// for Y-Control LFO
 		private var m_oscModL:Vector.<MOscModL>;	// 使用波形モジュール
 		private var m_oscLConnect:Vector.<int>;		// 有効・無効確認
+		private var m_lfoParam:Vector.<Array>;		// MMLからのパラメータ配列の参照を保持
 		private var m_lfoDepth:Vector.<Number>;
 		private var m_lfoDelay:Vector.<Number>;
 		private var m_lfoInit:Array;
@@ -63,6 +77,7 @@
 		private var m_filterConnect:int;
 		private var m_lpfAmt:Number;
 		private var m_lpfFrq:Number;
+		private var m_lpfFrq_LastVal:Number;
 		private var m_lpfRes:Number;
 		private var m_lpfInit:Array;
 		private var m_formant:MFormant;
@@ -132,7 +147,15 @@
 			m_vmode_max     = Number(MML.DEF_VSMAX);
 			m_vmode_index   = Number(MML.DEF_VSMAX);			//スタンバイ時は最大。m_volumeの初期値との整合性のため。
 			m_vmode_vzmd    = true;
-			// LFO stand by
+			// LFO stand by [static to member]
+			m_LFOclockMode = s_LFOclockMode;
+			m_LFOclockMgnf = s_LFOclockMgnf;
+			m_LFOclock = s_LFOclock;
+			m_lfoDeltaMode = s_lfoDeltaMode;
+			m_lfoDeltaMgnf = s_lfoDeltaMgnf;
+			m_lfoDelta = s_lfoDelta;
+			m_lfoLastSPT = 0.0;
+			// LFO stand by [module]
 			m_oscSetL0 = new MOscillatorL();
 			m_oscSetL1 = new MOscillatorLA();
 			m_oscSetL2 = new MOscillatorL();
@@ -140,6 +163,7 @@
 			m_oscSetL4 = new MOscillatorL();
 			m_oscModL = new Vector.<MOscModL>(LFO_MAX);
 			m_oscLConnect = new Vector.<int>(LFO_MAX);
+			m_lfoParam = new Vector.<Array>(LFO_MAX);
 			m_lfoDepth = new Vector.<Number>(LFO_MAX);
 			m_lfoDelay = new Vector.<Number>(LFO_MAX);
 			m_lfoInit  = new Array(0.0, 1.0, 0, 0, 0.0);			//depth, width, form, subform, delay
@@ -176,6 +200,7 @@
 			m_formant = new MFormant();
 			m_lpfAmt   = 0;
 			m_lpfFrq   = 0;
+			m_lpfFrq_LastVal = 0;
 			m_lpfRes   = 0;
 			m_lpfInit  = new Array(0.0, 0.0, 0.0);
 			// delay effect
@@ -195,6 +220,8 @@
 			setVolume(MML.DEF_VOL);							//setVolume()を初めて呼ぶ場合に必ずsetVolMode()を行っておく。
 			setPan(0.0);
 			setPanLegacy(0);
+			// エンベロープ
+			m_envLastSPT = 0.0;
 			// ノイズ周波数
 			setYControl(MOscillator.NOISE_W,   5, 1.0);		//Noise Freq.
 			setYControl(MOscillator.NOISE_FC,  5, 0.0);
@@ -202,6 +229,9 @@
 			setYControl(MOscillator.NOISE_PSG, 5, 1.0);
 			// LFO
 			m_onCounter = 0;
+			m_lfoPitchLastVal = 0;
+			m_lfoDelta_rmd = 0;
+			m_lfoDelta_rmd_F = 0;
 			setLFO(LFO_TARGET_PITCH, m_lfoInit, 1.0);
 			setLFO(LFO_TARGET_AMPLITUDE, m_lfoInit, 1.0);
 			setLFO(LFO_TARGET_FILTER, m_lfoInit, 1.0);
@@ -287,6 +317,9 @@
 				}
 			}
 			m_onCounter = 0;
+			m_lfoPitchLastVal = 0;
+			m_lfoDelta_rmd = 0;
+			m_lfoDelta_rmd_F = 0;
 			//for ENVELOPE
 			m_envelope1.triggerEnvelope();
 			m_envelope2.triggerEnvelope();
@@ -336,26 +369,29 @@
 		public function getNoteNo():int {
 			return m_noteNo;
 		}
-		public function setEnvTimeUnit(spt:Number):void {
-			var envclk:Number;
-			if (MEnvelope.s_envClockMode == true) {
-				envclk = ((spt * MEnvelope.s_envClockMgnf) / 44100.0);
-				if (envclk < (44.1 / 44100.0)) envclk = 44.1 / 44100.0;		//超高速モードにつきあう限界
-				MEnvelope.s_envClock = envclk;								//エンベロープ時間単位の追従
-			}
-			if (MEnvelope.s_envResolMode == 1) {
-				envclk = (spt * MEnvelope.s_envResolMgnf);
-				if (envclk < 44.1) envclk = 44.1;							//tick依存モードの解像度は1msを下限とする
-				MEnvelope.s_envResol = envclk;
-			}
+		public function setEnvSptUnit(spt:Number):void {
+			if (m_envLastSPT == spt) return;
+			
+			// env1:amp, env2:filter, env3:pwm
+			m_envelope1.followSPT(spt);
+			m_envelope2.followSPT(spt);
+			m_envelope3.followSPT(spt);
+			
+			m_envLastSPT = spt;
 		}
-		public function setLfoResolution(spt:Number):void {
+		public function setLfoSptUnit(spt:Number):void {
 			var lforeso:int;
-			if (s_lfoDeltaMode == true) {
-				lforeso = int(spt * s_lfoDeltaMgnf);
+			if (m_lfoLastSPT == spt) return;
+			
+			if (m_lfoDeltaMode == true) {
+				lforeso = int(spt * m_lfoDeltaMgnf);
 				if (lforeso < 147) lforeso = 147;							//超高速モードにつきあう限界
-				s_lfoDelta = lforeso;										//ＬＦＯ解像度の追従
+				m_lfoDelta = lforeso;										//ＬＦＯ解像度の追従
 			}
+			
+			refreshLFO(spt);
+			
+			m_lfoLastSPT = spt;
 		}
 		public function setMixingVolume(m_vol:Number):void {
 			var val:Number = m_vol;
@@ -473,6 +509,52 @@
 			m_oscMod1 = m_oscSet1.setForm(form);
 			m_oscMod1.setWaveNo(sub);
 		}
+		public function setOptionClock(func:int, mode:int, num:Number):void {
+			var lforeso:int;
+			switch (func) {
+				case 0:		//env.clock
+					m_envelope1.setEnvClockParam(mode, num);
+					m_envelope2.setEnvClockParam(mode, num);
+					m_envelope3.setEnvClockParam(mode, num);
+					if (mode == 1) {
+						m_envelope1.followSPT(m_envLastSPT);
+						m_envelope2.followSPT(m_envLastSPT);
+						m_envelope3.followSPT(m_envLastSPT);
+					}
+					break;
+				case 1:		//env.resol
+					m_envelope1.setEnvResolParam(mode, num);
+					m_envelope2.setEnvResolParam(mode, num);
+					m_envelope3.setEnvResolParam(mode, num);
+					if (mode == 1) {
+						m_envelope1.followSPT(m_envLastSPT);
+						m_envelope2.followSPT(m_envLastSPT);
+						m_envelope3.followSPT(m_envLastSPT);
+					}
+					break;
+				case 2:		//lfo.clock
+					m_LFOclockMode = ((mode == 0) ? false : true );
+					m_LFOclockMgnf = ((mode == 0) ? (1.0) : num  );			//m_LFOclockMode==falseのとき、m_LFOclockMgnfは参照されない
+					m_LFOclock =     ((mode == 0) ? num   : (1.0/120.0));	//m_LFOclockMode==trueのとき、m_LFOclockは参照されない
+					refreshLFO(m_lfoLastSPT);
+					break;
+				case 3:		//lfo.resol
+					m_lfoDeltaMode = ((mode == 0) ? false : true );
+					m_lfoDeltaMgnf = ((mode == 0) ? (1.0) : num  );			//m_lfoDeltaMode==falseのとき、m_lfoDeltaMgnfは参照されない
+					if (m_lfoDeltaMode == true) {
+						lforeso = int(m_lfoLastSPT * m_lfoDeltaMgnf);
+						if (lforeso < 147) lforeso = 147;							//超高速モードにつきあう限界
+						m_lfoDelta = lforeso;										//ＬＦＯ解像度の追従
+					}
+					else {
+						m_lfoDelta = int(44100.0 * num);
+					}
+					refreshLFO(m_lfoLastSPT);
+					break;
+				default:
+					break;
+			}
+		}
 		public function setEnvelope(dest:int, lvRd_mode:int, atk_mode:Boolean, initlevel:Number, evPoints:Array):void {
 			var i:int;
 			var len:int;
@@ -541,11 +623,13 @@
 			// parameter check
 			if (depth == 0.0) {
 				m_oscLConnect[target] = 0;
+				m_lfoParam[target] = null;
 			}
 			else {
 				m_oscLConnect[target] = 1;
+				m_lfoParam[target] = paramA;		//指定パラメータ配列の参照を保存
 			}
-			if ( (width == 0.0) || (spt == 0.0) || (s_LFOclock == 0.0) || (s_LFOclockMgnf == 0.0) ) {
+			if ( (width == 0.0) || (m_LFOclock == 0.0) || (m_LFOclockMgnf == 0.0) ) {
 				m_oscLConnect[target] = 0;
 			}
 			switch (target) {
@@ -630,18 +714,19 @@
 			}
 
 			// parameter set: width
-			if (s_LFOclockMode == true) {
-				width = width * s_LFOclockMgnf;
-				freq = 44100.0 / (width * spt);
+			if (m_LFOclockMode == true) {
+				width = width * m_LFOclockMgnf;
+				if (spt != 0.0) { freq = 44100.0 / (width * spt); }
+				else { freq = 44100.0; }
 			}
 			else {
-				freq = 44100.0 / (width * (44100.0 * s_LFOclock));
+				freq = 44100.0 / (width * (44100.0 * m_LFOclock));
 			}
-			if (s_lfoDeltaMode == true) {
-				widthSMP = (width * (spt * s_lfoDeltaMgnf));
+			if (m_lfoDeltaMode == true) {
+				widthSMP = (width * (spt * m_lfoDeltaMgnf));
 			}
 			else {
-				widthSMP = (width * Number(s_lfoDelta));
+				widthSMP = (width * Number(m_lfoDelta));
 			}
 			m_oscModL[target].setFrequency(freq);
 			m_oscModL[target].resetPhase();
@@ -676,11 +761,11 @@
 
 			// parameter set: delay
 			if (delay >= 0.0) {
-				if (s_LFOclockMode == true) {
-					m_lfoDelay[target] = (delay * s_LFOclockMgnf) * spt;
+				if (m_LFOclockMode == true) {
+					m_lfoDelay[target] = (delay * m_LFOclockMgnf) * spt;
 				}
 				else {
-					m_lfoDelay[target] = delay * (44100.0 * s_LFOclock);
+					m_lfoDelay[target] = delay * (44100.0 * m_LFOclock);
 				}
 			}
 			else {
@@ -700,28 +785,138 @@
 			default:
 				break;
 			}
-
+			
 			//ＬＦＯディレイ用カウンタをクリア（タイ中のＬＦＯ再設定を想定）
 			m_onCounter = 0;
+			
+			//その他ワークのクリア
+			switch (target) {
+			case LFO_TARGET_PITCH:
+				m_lfoDelta_rmd = 0;
+				m_lfoPitchLastVal = 0;
+				break;
+			case LFO_TARGET_FILTER:
+				m_lfoDelta_rmd_F = 0;
+				break;
+			case LFO_TARGET_YCONTROL:
+				m_lfoDelta_rmd = 0;
+				break;
+			default:
+				break;
+			}
 		}
 		public function setLFOrestart(target:int):void {
 			var valid:Boolean;
 			// target check
 			switch (target) {
-				case LFO_TARGET_PITCH:
-				case LFO_TARGET_AMPLITUDE:
-				case LFO_TARGET_FILTER:
-				case LFO_TARGET_PANPOT:
-				case LFO_TARGET_YCONTROL:
-					valid = true;
-					break;
-				default:
-					valid = false;
+			case LFO_TARGET_PITCH:
+			case LFO_TARGET_AMPLITUDE:
+			case LFO_TARGET_FILTER:
+			case LFO_TARGET_PANPOT:
+			case LFO_TARGET_YCONTROL:
+				valid = true;
+				break;
+			default:
+				valid = false;
 			}
 			if (valid == false) return;
 			
 			m_oscModL[target].resetPhase();
 			m_onCounter = 0;
+			
+			//その他ワークのクリア
+			switch (target) {
+			case LFO_TARGET_PITCH:
+				m_lfoDelta_rmd = 0;
+				m_lfoPitchLastVal = 0;
+				break;
+			case LFO_TARGET_FILTER:
+				m_lfoDelta_rmd_F = 0;
+				break;
+			case LFO_TARGET_YCONTROL:
+				m_lfoDelta_rmd = 0;
+				break;
+			default:
+				break;
+			}
+		}
+		private function refreshLFO(spt:Number):void {
+			var paramA:Array;
+			var width:Number;
+			var freq:Number;
+			var widthSMP:Number;
+			var delay:Number;
+			var target:int;
+			
+			for (target=0; target<LFO_MAX; target++){
+				paramA = m_lfoParam[target];
+				if (paramA == null) { continue; }
+				
+				width = paramA[1];
+				delay = paramA[4];
+				
+				// parameter set: width
+				if (m_LFOclockMode == true) {
+					width = width * m_LFOclockMgnf;
+					freq = 44100.0 / (width * spt);
+				}
+				else {
+					freq = 44100.0 / (width * (44100.0 * m_LFOclock));
+				}
+				if (m_lfoDeltaMode == true) {
+					widthSMP = (width * (spt * m_lfoDeltaMgnf));
+				}
+				else {
+					widthSMP = (width * Number(m_lfoDelta));
+				}
+				m_oscModL[target].setFrequency(freq);
+				m_oscModL[target].resetPhase();
+				switch (target) {
+					case LFO_TARGET_PITCH:
+						(MOscLNoiseW)(m_oscSetL0.getMod(MOscillatorL.NOISE_W)).setNoiseFreq( width );
+						(MOscLTable)(m_oscSetL0.getMod(MOscillatorL.TABLE)).setPShiftParam( width );
+						(MOscLBendNL)(m_oscSetL0.getMod(MOscillatorL.NONL_BEND)).setBendWidth( width );
+						break;
+					case LFO_TARGET_AMPLITUDE:
+						(MOscLNoiseWA)(m_oscSetL1.getMod(MOscillatorLA.NOISE_W)).setNoiseFreq( widthSMP );
+						(MOscLTable)(m_oscSetL1.getMod(MOscillatorLA.TABLE)).setPShiftParam( widthSMP );
+						break;
+					case LFO_TARGET_FILTER:
+						(MOscLNoiseW)(m_oscSetL2.getMod(MOscillatorL.NOISE_W)).setNoiseFreq( width );
+						(MOscLTable)(m_oscSetL2.getMod(MOscillatorL.TABLE)).setPShiftParam( width );
+						(MOscLBendNL)(m_oscSetL2.getMod(MOscillatorL.NONL_BEND)).setBendWidth( width );
+						break;
+					case LFO_TARGET_PANPOT:
+						(MOscLNoiseW)(m_oscSetL3.getMod(MOscillatorL.NOISE_W)).setNoiseFreq( widthSMP );
+						(MOscLTable)(m_oscSetL3.getMod(MOscillatorL.TABLE)).setPShiftParam( widthSMP );
+						(MOscLBendNL)(m_oscSetL3.getMod(MOscillatorL.NONL_BEND)).setBendWidth( widthSMP );
+						break;
+					case LFO_TARGET_YCONTROL:
+						(MOscLNoiseW)(m_oscSetL4.getMod(MOscillatorL.NOISE_W)).setNoiseFreq( width );
+						(MOscLTable)(m_oscSetL4.getMod(MOscillatorL.TABLE)).setPShiftParam( width );
+						(MOscLBendNL)(m_oscSetL4.getMod(MOscillatorL.NONL_BEND)).setBendWidth( width );
+						break;
+					default:
+						break;
+				}
+				
+				// parameter set: delay
+				if (delay >= 0.0) {
+					if (m_LFOclockMode == true) {
+						m_lfoDelay[target] = (delay * m_LFOclockMgnf) * spt;
+					}
+					else {
+						m_lfoDelay[target] = delay * (44100.0 * m_LFOclock);
+					}
+				}
+				else {
+					m_lfoDelay[target] = (-1.0);		//ノートオン非同期モード
+				}
+			}
+			
+			//pitch/portamento/Y-ctrl, IIR filter LFO の更新間隔調整用ワークをクリアしておく
+			m_lfoDelta_rmd = 0;
+			m_lfoDelta_rmd_F = 0;
 		}
 		public function setLPF(swt:int, paramA:Array):void {
 			var amt:Number = paramA[0];
@@ -752,6 +947,7 @@
 			else {
 				m_lpfFrq = frq / 44100.0;
 			}
+			m_lpfFrq_LastVal = m_lpfFrq;
 			// res
 			if (res <= 0.0) {
 				m_lpfRes = 0.0;
@@ -888,6 +1084,12 @@
 				m_delayVal_R = 0.0;
 			}
 		}
+		public function setDelayRestart():void {
+			if (m_delayMode == 1) {
+				//既にディレイエフェクト稼働中なら、ディレイの再スタートを行う
+				m_delayPrepare = m_delayBufSize;
+			}
+		}
 		public function culcDelay(inputL:Number, inputR:Number):void {
 			var now_p:int;
 			var next_p:int;
@@ -931,10 +1133,11 @@
 			var trackBuffer:Vector.<Number> = s_samples;
 			var playing:Boolean = isPlaying();
 			var tmpFlag:Boolean;
+			var lfoDeltaRmdFlag:Boolean;
+			var lfoDeltaPrev:int;
 			var freqNo:Number;
 			var depth:Number, depth2:Number;
 			var vol:Number, Vscale:Number, Vrate:Number;
-			var lpffrq:Number;
 			var key:Number = getFrequency(m_freqNo);
 			var pan:Number;
 			var amplitude:Number, rightAmplitude:Number;
@@ -959,27 +1162,69 @@
 					onCounter = m_onCounter;
 					//LFO入力波形は、0.0を中心に-1.0～1.0を行き来するモジュール
 					do {
-						e = s + s_lfoDelta;
-						if (e > end) e = end;
-						//for pitch
-						freqNo = m_freqNo;
-						if (m_portDepth != 0.0) {
-							freqNo += m_portDepth;
-							m_portDepth += (m_portDepthAdd * Number(e - s - 1));
-							if ((m_portDepth * m_portDepthAdd) > 0.0) m_portDepth = 0.0;
+						if (m_lfoDelta_rmd == 0) {
+							e = s + m_lfoDelta;
+							lfoDeltaRmdFlag = true;
+						} else {
+							e = s + m_lfoDelta_rmd;
+							lfoDeltaRmdFlag = false;
+							lfoDeltaPrev = m_lfoDelta - m_lfoDelta_rmd;	//前回処理分
 						}
-						if (m_oscLConnect[LFO_TARGET_PITCH] != 0) {
-							if (onCounter >= m_lfoDelay[LFO_TARGET_PITCH]) {
-								freqNo += (m_oscModL[LFO_TARGET_PITCH].getNextSample() * depth);
-								m_oscModL[LFO_TARGET_PITCH].addPhase(e - s - 1);
+						if (e > end) {
+							m_lfoDelta_rmd = (e - end);			//はみ出す分を持ち越す
+							//trace("rmd:"+m_lfoDelta_rmd);
+							e = end;
+						}
+						else {
+							m_lfoDelta_rmd = 0;					//はみ出さない場合
+						}
+						if (lfoDeltaRmdFlag == true) {
+							//for pitch
+							freqNo = m_freqNo;
+							if (m_portDepth != 0.0) {
+								freqNo += m_portDepth;
+								if (m_lfoDelta_rmd == 0) {
+									m_portDepth += (m_portDepthAdd * Number(e - s - 0));				//getNextSample()をしないので-1が不要
+									if ((m_portDepth * m_portDepthAdd) > 0.0) m_portDepth = 0.0;
+								}
+							}
+							if (m_oscLConnect[LFO_TARGET_PITCH] != 0) {
+								if (onCounter >= m_lfoDelay[LFO_TARGET_PITCH]) {
+									m_lfoPitchLastVal = (m_oscModL[LFO_TARGET_PITCH].getNextSample() * depth);
+									freqNo += m_lfoPitchLastVal;
+									m_oscModL[LFO_TARGET_PITCH].addPhase(e - s - 1);
+								}
+							}
+							//trace("1freq:"+freqNo+"  d:"+(e - s));
+							m_oscMod1.setFrequency(getFrequency(freqNo));
+							//for Y-Control
+							if (m_oscLConnect[LFO_TARGET_YCONTROL] != 0) {
+								if (onCounter >= m_lfoDelay[LFO_TARGET_YCONTROL]) {
+									modY.setYControl(m_lfoYfuncMod, m_lfoYfuncNum, (m_oscModL[LFO_TARGET_YCONTROL].getNextSample() * depth2));
+									m_oscModL[LFO_TARGET_YCONTROL].addPhase(e - s - 1);
+								}
 							}
 						}
-						m_oscMod1.setFrequency(getFrequency(freqNo));
-						//for Y-Control
-						if (m_oscLConnect[LFO_TARGET_YCONTROL] != 0) {
-							if (onCounter >= m_lfoDelay[LFO_TARGET_YCONTROL]) {
-								modY.setYControl(m_lfoYfuncMod, m_lfoYfuncNum, (m_oscModL[LFO_TARGET_YCONTROL].getNextSample() * depth2));
-								m_oscModL[LFO_TARGET_YCONTROL].addPhase(e - s - 1);
+						else {
+							//はみ出す分の周波数維持とlfo位相進行
+							freqNo = m_freqNo;
+							if (m_portDepth != 0.0) {
+								freqNo += m_portDepth;
+								m_portDepth += (m_portDepthAdd * Number(e - s - 0 + lfoDeltaPrev));		//前回＋今回のサンプル数
+								if ((m_portDepth * m_portDepthAdd) > 0.0) m_portDepth = 0.0;
+							}
+							if (m_oscLConnect[LFO_TARGET_PITCH] != 0) {
+								if (onCounter >= m_lfoDelay[LFO_TARGET_PITCH]) {
+									freqNo += m_lfoPitchLastVal;
+									m_oscModL[LFO_TARGET_PITCH].addPhase(e - s - 1);
+								}
+							}
+							//trace("2freq:"+freqNo+"  d:"+(e - s));
+							m_oscMod1.setFrequency(getFrequency(freqNo));
+							if (m_oscLConnect[LFO_TARGET_YCONTROL] != 0) {
+								if (onCounter >= m_lfoDelay[LFO_TARGET_YCONTROL]) {
+									m_oscModL[LFO_TARGET_YCONTROL].addPhase(e - s - 1);
+								}
 							}
 						}
 						//PWM+WaveSet or WaveSet
@@ -1122,19 +1367,38 @@
 					onCounter = m_onCounter;
 					//LFO入力波形は、0.0を中心に-1.0～1.0を行き来するモジュール
 					do {
-						e = s + s_lfoDelta;
-						if (e > end) e = end;
-						lpffrq = m_lpfFrq;
-						if (onCounter >= m_lfoDelay[LFO_TARGET_FILTER]) {
-							lpffrq += m_oscModL[LFO_TARGET_FILTER].getNextSample() * depth;
-							m_oscModL[LFO_TARGET_FILTER].addPhase(e - s - 1);
+						if (m_lfoDelta_rmd_F == 0) {
+							e = s + m_lfoDelta;
+							lfoDeltaRmdFlag = true;
+						} else {
+							e = s + m_lfoDelta_rmd_F;
+							lfoDeltaRmdFlag = false;
 						}
-						if(lpffrq < 0.0){
-							lpffrq = 0.0;
-						}else if(lpffrq > 1.0){
-							lpffrq = 1.0;
+						if (e > end) {
+							m_lfoDelta_rmd_F = e - end;		//はみ出す分を持ち越す。
+							e = end;
 						}
-						m_filter.run(trackBuffer, s, e, m_envelope2, lpffrq, m_lpfAmt, m_lpfRes, key);
+						else {
+							m_lfoDelta_rmd_F = 0;			//はみ出さない場合
+						}
+						if (lfoDeltaRmdFlag == true) {
+							m_lpfFrq_LastVal = m_lpfFrq;
+							if (onCounter >= m_lfoDelay[LFO_TARGET_FILTER]) {
+								m_lpfFrq_LastVal += m_oscModL[LFO_TARGET_FILTER].getNextSample() * depth;
+								m_oscModL[LFO_TARGET_FILTER].addPhase(e - s - 1);
+							}
+							if(m_lpfFrq_LastVal < 0.0){
+								m_lpfFrq_LastVal = 0.0;
+							}else if(m_lpfFrq_LastVal > 1.0){
+								m_lpfFrq_LastVal = 1.0;
+							}
+						}
+						else {
+							if (onCounter >= m_lfoDelay[LFO_TARGET_FILTER]) {
+								m_oscModL[LFO_TARGET_FILTER].addPhase(e - s - 0);		//位相のみ進める
+							}
+						}
+						m_filter.run(trackBuffer, s, e, m_envelope2, m_lpfFrq_LastVal, m_lpfAmt, m_lpfRes, key);
 						onCounter += e - s;
 						s = e;
 					} while(s < end);

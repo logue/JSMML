@@ -77,6 +77,9 @@
 		public function setPhaseRMode(m:int, ph:Number):void {
 			set(MStatus.PHASE_R_MODE,  m, 0, ph, null);
 		}
+		public function setOptionClock(f:int, m:int, n:Number):void {
+			set(MStatus.OPTION_CLOCK,  f, m, n, null);
+		}
 		public function setEnvelope(p:int, r:int, lv:Number, a:Array):void {
 			set(MStatus.ENVELOPE,      p, r, lv, a);
 		}
@@ -157,6 +160,9 @@
 		public function getSubForm():int			{ return m_data0; }
 		public function getPhaseRMode():int			{ return m_data0; }
 		public function getPhaseRModePH():Number	{ return m_dataN; }
+		public function getOptionClockFunc():int	{ return m_data0; }
+		public function getOptionClockMode():int	{ return m_data1; }
+		public function getOptionClockNum():Number	{ return m_dataN; }
 		public function getEnvelopePdest():int		{ return m_data0; }
 		public function getEnvelopeRlvRoundM():int	{ return (m_data1 & 0x0ff); }
 		public function getEnvelopeRattackM():int	{ return ((m_data1 >> 8) & 1); }

@@ -13,6 +13,7 @@
 		protected static var s_loopPt:Vector.<int>;		//ループポイント
 		protected static var s_length:Vector.<int>;		//再生レングス。１サンプル８ビットでサンプル数を持つ。
 		protected static var s_adpType:Vector.<int>;	//ADPCM Type。0:YM mode, 1:MSM mode
+		protected static var s_ReleaseMode:int = 3;		//終端リリース処理モード。0:変位維持, 1以上:変位０までのステップ数
 		
 		protected static var s_YM_tbl1:Vector.<int> = Vector.<int>([
 			1,   3,   5,   7,   9,  11,  13,  15,
@@ -38,12 +39,15 @@
 		protected var m_interval:Number;
 		protected var m_position:Number;
 		protected var m_amp:Number;
-		protected var m_address:int = 0;		//読み込み中のアドレス位置
-		protected var m_bit:int = 0;			//読み込み中のビット位置
-		protected var m_wav:Number = 0.0;		//現在の変位
-		protected var m_length:int = 0;			//残りサンプル数
-		protected var m_NextWav:Number = 0.0;	//次回の変位
-		protected var m_NextDiff:Number = 0.0;	//次回変位への差分
+		protected var m_address:int = 0;			//読み込み中のアドレス位置
+		protected var m_bit:int = 0;				//読み込み中のビット位置
+		protected var m_wav:Number = 0.0;			//現在の変位
+		protected var m_length:int = 0;				//残りサンプル数
+		protected var m_NextWav:Number = 0.0;		//次回の変位
+		protected var m_NextDiff:Number = 0.0;		//次回変位への差分
+		protected var m_ReleaseMode:int = 0;		//終端リリース処理モード
+		protected var m_ReleaseLeft:int = 0;		//終端リリースシーケンス残り回数
+		protected var m_ReleaseDiff:Number = 0.0;	//終端リリースの変位差分
 		
 		public function MOscSmpADPCM() {
 			boot();
@@ -52,6 +56,7 @@
 			setWaveNo(0);
 			setRenderFunc(1);
 			setFrequency(440.0);
+			setReleaseModeValue(s_ReleaseMode);
 		}
 		public static function boot():void {
 			if (s_init != 0) return;
@@ -131,6 +136,7 @@
 			var pcm:int;
 			var adpcm:int = (adp & 15);
 			if (mode == ADPTYPE_YM) {
+				//正数の切り捨ては０に近い方、負数の切り捨ても０に近い方。
 				s_YM_adpcmX = limitNumI(-32768, 32767, (s_YM_adpcmX + ((s_YM_tbl1[adpcm] * s_YM_adpcmD) / 8)) );
 				s_YM_adpcmD = limitNumI(   127, 24576, ((s_YM_adpcmD * s_YM_tbl2[adpcm]) / 64) );
 				pcm = s_YM_adpcmX & 0x0ffff;
@@ -255,6 +261,20 @@
 				}
 			}
 		}
+		private function setReleaseModeValue(rmode:int):void {
+			if (rmode < 1) {
+				m_ReleaseMode = 0;
+				stopRelease();
+			}
+			else {
+				m_ReleaseMode = rmode;
+				stopRelease();
+			}
+		}
+		private function stopRelease():void {
+			m_ReleaseLeft = 0;
+			m_ReleaseDiff = 0.0;
+		}
 		private function prepareNextValue():void {
 			var val:int;
 			if (m_length > 0) {
@@ -277,20 +297,34 @@
 						m_bit = 0;
 						m_address++;
 					}
+					prepareNextValue();
 				}
 				else {
-					//残りが無い場合はループ時の更新と線形補完用差分のクリア
+					//残りが無い場合はループ処理もしくは終端処理
 					if (s_loopPt[m_waveNo] >= 0) {
 						m_address = (s_loopPt[m_waveNo] >> 1);
 						m_bit = (s_loopPt[m_waveNo] % 2) * 16;
 						m_length = s_length[m_waveNo] - s_loopPt[m_waveNo];
+						prepareNextValue();
 					}
 					else {
-						m_wav = 0.0;
+						m_NextWav = m_wav;		//終端値の継続
+						m_NextDiff = 0.0;
 					}
-					m_NextDiff = 0.0;
 				}
-				prepareNextValue();
+			}
+			else if (m_length == 0) {
+				if (m_ReleaseMode > 0) {
+					//変位終端のリリースシーケンスモード
+					m_length = (-1);
+					m_ReleaseLeft = m_ReleaseMode;
+					m_ReleaseDiff = (0.0 - m_wav) / Number(m_ReleaseMode);
+				}
+				else {
+					//変位終端値の継続モード
+					m_length = (-2);
+					stopRelease();
+				}
 			}
 			return m_wav;
 		}
@@ -301,6 +335,7 @@
 			m_wav = 0.0;
 			m_length = s_length[m_waveNo];
 			prepareNextValue();
+			stopRelease();
 		}
 		private function getNextSample0():Number {
 			var val:Number = m_wav;
@@ -309,12 +344,23 @@
 				m_position -= 1.0;
 				val = getValue();
 			}
+			//変位終端のリリースシーケンス要求に応じて処理
+			if (m_length == (-1)) {
+				if (m_ReleaseLeft > 0) {
+					m_ReleaseLeft--;
+					m_wav += m_ReleaseDiff;
+				}
+				else {
+					m_length = (-2);
+				}
+			}
 			return val;
 		}
 		private function getNextSample1():Number {
 			var val:Number = m_wav;
 			m_position += m_interval;
 			if (m_interval < 1.0) {
+				//44.1kHz未満の場合のみ線形補完を考慮する手順
 				if (m_position >= 1.0) {
 					m_position -= 1.0;
 					val = getValue();
@@ -325,6 +371,16 @@
 				while (m_position >= 1.0) {
 					m_position -= 1.0;
 					val = getValue();
+				}
+			}
+			//変位終端のリリースシーケンス要求に応じて処理
+			if (m_length == (-1)) {
+				if (m_ReleaseLeft > 0) {
+					m_ReleaseLeft--;
+					m_wav += m_ReleaseDiff;
+				}
+				else {
+					m_length = (-2);
 				}
 			}
 			return val;
@@ -389,6 +445,9 @@
 			case 3:		//func.3: setDetune
 				break;
 			case 4:		//func.4: reserved
+				break;
+			case 5:		//sp.func.5: setReleaseModeValue
+				setReleaseModeValue(int(n));
 				break;
 			}
 		}

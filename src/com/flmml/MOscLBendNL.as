@@ -27,7 +27,7 @@
 		}
 		public override function getNextSample():Number {
 			m_counter -= 1.0;
-			if (m_counter <= 0.0) {
+			if (m_counter < 0.0) {
 				m_preCulc = m_preCulc - (m_preCulc * (m_incParam / 1024.0));
 				m_val = m_preCulc + 1.0;
 				m_counter += m_refreshCycle;
@@ -39,6 +39,13 @@
 			if (n < 1.0)     n = 1.0;
 			if (n > 44100.0) n = 44100.0;
 			m_refreshCycle = n;
+		}
+		public override function addPShift(sample:int):void {
+			var i:int;
+			if (sample <= 0) return;
+			for (i=0; i<sample; i++) {
+				getNextSample();
+			}
 		}
 		public override function setWaveNo(waveNo:int):void {
 			var n:Number = Number(waveNo);

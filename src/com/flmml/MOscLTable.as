@@ -236,6 +236,16 @@
 				}
 			}
 		}
+		public override function addPShift(sample:int):void {
+			var endp:Number = Number(s_length[m_waveNo]);
+			var lpp:Number = Number(s_Lentry[m_waveNo]);
+			var smp:int = (sample>=0) ? sample : 0;
+			
+			m_position += (m_ptrShift * Number(smp));
+			if (m_position >= endp) {
+				m_position = ((m_position - lpp) % (endp - lpp)) + lpp;
+			}
+		}
 		public override function setWaveNo(waveNo:int):void {
 			var n:int = waveNo;
 			if (n >= MAX_WAVE) n = MAX_WAVE-1;

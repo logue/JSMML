@@ -2,46 +2,131 @@
 
 <mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
 				xmlns:flmml="com.flmml.*"
-				minWidth="600" minHeight="400" creationComplete="init();" horizontalAlign="center"
+				creationComplete="init();" horizontalAlign="center"
 				layout="absolute" verticalAlign="top">
 
 	<mx:Style>
 		@namespace mx "http://www.adobe.com/2006/mxml";
-		global
-		{
+		global {
 			font-size: 14;
+			focus-color: #60C1FF;
+			roll-over-color: #60C1FF;
+			selection-color: #C0EAFF;
 		}
-		mx|TextArea,mx|TextInput,mx|DataGrid {
-			font-family: "MS Gothic","Osaka-Mono";
+		mx|TextArea,mx|TextInput,mx|DataGrid,.UserText {
+			font-family: "MS Gothic","Migu 1M","Osaka-Mono";
 		}
 	</mx:Style>
 
 	<mx:Script>
 	<![CDATA[
-		import flash.events.Event;
-		import flash.events.IOErrorEvent;
+		import com.flmml.MMLEvent;
+		
+		import flash.display.*;
+		import flash.events.*;
+		import flash.geom.*;
 		import flash.net.URLLoader;
 		import flash.net.URLRequest;
+		import flash.text.*;
+		
 		import mx.collections.ArrayCollection;
+		import mx.controls.TextArea;
+		import mx.core.UIComponent;
+		import mx.events.DropdownEvent;
 		import mx.events.ListEvent;
 		import mx.managers.CursorManager;
-
-		import com.flmml.MMLEvent;
-
-		protected var m_timer:Timer;
-
+		
 		protected var m_xml:XML;
 		XML.ignoreComments = false;
 		XML.ignoreWhitespace = true;
-
+		
 		protected var m_plMode:Boolean = false;
 		protected var m_selFile:String;
 		protected var m_urlList:Array = new Array();
 		protected var m_loader:URLLoader;
 		protected var m_request:URLRequest;
+		
+		protected var m_now_sec:Number;
+		protected var m_last_sec:Number;
+		protected var m_totaltimeStr:String;
+		
+		protected var m_uiMode:int;
+		protected const MODE_DISP_BROWSE:int = 0;
+		protected const MODE_DISP_MML:int = 1;
+		protected const MODE_BROWSE_ONLY:int = 2;
+		protected const MODE_MML_ONLY:int = 3;
+		protected const MODE_BROWSE_MML:int = 4;
+		
+		protected const SUB_COLOR:int = 0xf7f7f7;		//0xEFF3FA;
+		protected const FOCUS_COLOR2:int = 0xFFB540;
+		
+		//visual display
+		protected const DELAY_DSP:Number = ((8192.0/44.1) - (1000.0/60.0));
 
+		protected const TRACK_MAX:int = 10;
+		protected const TOP_W_OFS:int = 22;
+		protected const TOP_H_OFS:int = 22;
+		protected const BTM_H_OFS:int = 10;
+		protected const OCT_MAX:int = 10;
+		protected const KEY_MAX:int = (OCT_MAX * 12) + 1;
+		protected const KEY_W_W:int = 6;
+		protected const KEY_B_W:int = 5;
+		protected const KEY_W_H:int = 24;
+		protected const KEY_B_H:int = 14;
+		protected const KEY_HEIGHT:int = 36;
+		protected const KEY_MK_OFS:Vector.<int> = Vector.<int>([ 15, 5, ]);
+		protected const KEY_MK_SIZE:int = 8;
+		protected const KEYDISP_HEIGHT:int = TOP_H_OFS + (KEY_HEIGHT*TRACK_MAX) + BTM_H_OFS;
+		protected const KEYDISP_WIDTH:int  = TOP_W_OFS + ((KEY_W_W * 7) * OCT_MAX) + KEY_W_W;
+		//protected const KD_BGCOLOR:int = 0xEFF3FA;
+		protected const KD_BGCOLOR:int = 0x202020;
+		protected const KEY_ON_COLOR:int = 0xff0000;
+		protected const KEY_NOW_COLOR:int = 0xffb030;
+		protected const INDI_COL_GAP:int     = KD_BGCOLOR;
+		protected const INDI_COL_OFF:int     = 0x505050;
+		protected const INDI_COL_LGPAN:int   = 0xf09910;		//0xffa210		//0xf09910
+		protected const INDI_COL_PAN:int     = 0xf00000;		//0xff0000		//0xf00000
+		protected const INDI_COL_PAN_NOW:int = 0xf0a020;
+		protected const INDI_COL_VOL:int     = 0x2090d8;		//0x2498e8		//0x2090d8
+		
+		protected var m_trackOfs:int;
+		
+		protected var noteOn:Vector.<Vector.<Number>> = new Vector.<Vector.<Number>>(TRACK_MAX);
+		protected var release:Vector.<Vector.<Number>> = new Vector.<Vector.<Number>>(TRACK_MAX);
+		protected var noteOnRect:Vector.<Vector.<Rectangle>> = new Vector.<Vector.<Rectangle>>(TRACK_MAX);
+		protected var lgPanRect:Vector.<Vector.<Rectangle>> = new Vector.<Vector.<Rectangle>>(TRACK_MAX);
+		protected var panRect:Vector.<Vector.<Rectangle>> = new Vector.<Vector.<Rectangle>>(TRACK_MAX);
+		protected var volRect:Vector.<Vector.<Rectangle>> = new Vector.<Vector.<Rectangle>>(TRACK_MAX);
+		protected var keyImage:BitmapData = new BitmapData(KEYDISP_WIDTH, KEYDISP_HEIGHT, false, KD_BGCOLOR);
+		protected var keyOnImage:BitmapData = new BitmapData(KEYDISP_WIDTH, KEYDISP_HEIGHT, true, 0x00000000);
+		protected var keyShape:Shape = new Shape();
+		protected var lbl:Label = new Label();
+		protected var mat:Matrix = new Matrix();
+		protected var rc:Rectangle = new Rectangle();
+		protected var refreshRc:Rectangle = new Rectangle();
+		protected var container:Sprite;
+		protected var keyboardDisplay:UIComponent = new UIComponent();
+		protected var tempoIndicatorAlpha:Number = 0;
+		//trackStatusLabel[track][0]はtr番号、[1]と[2]は状態１行目、２行目。
+		protected var trackStatusLabel:Vector.<Vector.<Label>> = new Vector.<Vector.<Label>>(TRACK_MAX);
+		protected var trackStatusL_Tr:Label = new Label();
+		protected var trackStatusL_Tempo:Label = new Label();
+		protected var trackStatusL_Title:Label = new Label();
+		protected var trackStatusKeyboadMask:Vector.<Rectangle> = new Vector.<Rectangle>(TRACK_MAX);
+		
 		[Bindable]
 		public var m_playlist:ArrayCollection = new ArrayCollection();
+		
+		[Bindable]
+		public var m_menu:ArrayCollection = new ArrayCollection(
+			[
+				{label:"KeyDisp & browse", data:MODE_DISP_BROWSE},
+				{label:"KeyDisp & MML", data:MODE_DISP_MML},
+				{label:"browse only", data:MODE_BROWSE_ONLY},
+				{label:"MML only", data:MODE_MML_ONLY},
+				{label:"browse & MML", data:MODE_BROWSE_MML},
+			]
+		);
 
 		public function init():void {
 			if (this.parameters["mml"] != undefined) input.text = unescape(this.parameters["mml"]);
@@ -49,10 +134,12 @@
 			player.addEventListener(MMLEvent.COMPILE_COMPLETE, setWarnings);
 			player.addEventListener(MMLEvent.COMPLETE,         onComplete);
 			player.addEventListener(MMLEvent.BUFFERING,        onBuffering);
-			m_timer = new Timer(250*4, 0);
-			m_timer.addEventListener(TimerEvent.TIMER, onSecond);
 
 			setPlaylist("plist0.xml");
+			m_uiMode = (-1);		//強制初期化モード
+			toDispAndBrowse();
+			
+			setup();
 		}
 
 		public function setPlaylist(filename:String):void {
@@ -165,19 +252,23 @@
 			var loader:URLLoader;
 			loader = event.target as URLLoader; 
 			if (loader != null) {
+				input.verticalScrollPosition = 0;
+				warnings.verticalScrollPosition = 0;
 				input.text = "";
 				input.text = String(loader.data).replace(/\r\n|\r/g, '\n');
+				mmlTitle.text = "";
+				mmlComment.text = "";
+				trackStatusL_Title.text = "";
 				warnings.text = "";
-				warnings2.text = "";
 				m_loader = null;
 				m_request = null;
 				CursorManager.removeBusyCursor();
 				if (player.isPlaying()==true) {
 					stop();
-					play();
+					togglePlay();
 				}
 				else {
-					play();
+					togglePlay();
 				}
 			}
 		}
@@ -189,121 +280,724 @@
 		}
 
 		public function setWarnings(e:Event):void {
+			mmlTitle.text = player.getMetaTitle();
+			mmlComment.text = player.getMetaComment();
+			trackStatusL_Title.text = String(mmlTitle.text + ((mmlTitle.text.length>0)?"\n":"") + mmlComment.text).replace(/\n|\r\n|\r/g, ', ');
 			warnings.text = player.getWarnings();
-			warnings2.text = warnings.text;
 		}
 
-		public function play():void {
+		// [play<->stop] model
+		public function togglePlay():void {
 			if (!player.isPlaying()) {
-				if (player.isPaused()) m_timer.start();
-				if (player.play(input.text) == true) {
-					playButton.label = "Pause";
-					currentTitle.text = player.getMetaTitle();
-					currentComment.text = player.getMetaComment();
-					player.setMasterVolume(hSlider.value);
+				if (player.play(input.text, uint(startTick_ti.text)) == true) {
+					togglePlayButton.label = "Stop";
+					initBeforePlay();
 				}
 				else {
 					stop();
 				}
 			}
 			else {
-				player.pause();
-				playButton.label = "Play";
-				m_timer.stop();
+				stop();
+			}
+		}
+		public function stop():void {
+			player.stop();
+			togglePlayButton.label = "Play";
+			progress.text = "";
+		}
+
+		private function initBeforePlay():void {
+			m_now_sec = 0.0;
+			m_last_sec = 0.0;
+			m_totaltimeStr = "";
+			
+			m_trackOfs = 1;
+			setTrackOfs(0);
+			resetKeyDisp();
+			
+			trackStatusL_Tempo.text = "";
+			for (var i:int=0; i<TRACK_MAX; i++) {
+				trackStatusLabel[i][1].text = "";
+				trackStatusLabel[i][2].text = "";
+			}
+			
+			player.setMasterVolume(hSlider.value);
+			player.sequenceTrackInfo_init(DELAY_DSP);
+		}
+
+		public function changeScreenMode(event:DropdownEvent):void {
+			switch (ComboBox(event.target).selectedItem.data) {
+				default:
+				case MODE_DISP_BROWSE:
+					toDispAndBrowse();
+					break;
+				case MODE_DISP_MML:
+					toDispAndMML();
+					break;
+				case MODE_BROWSE_ONLY:
+					toBrowse();
+					break;
+				case MODE_MML_ONLY:
+					toMMLEdit();
+					break;
+				case MODE_BROWSE_MML:
+					toBrowseAndMML();
+					break;
+			}
+		}
+		public function toDispAndBrowse():void {
+			if (m_uiMode != MODE_DISP_BROWSE) {
+				statusBox.height = Number(KEYDISP_HEIGHT + 2);
+				statusDisp.height = Number(KEYDISP_HEIGHT);
+				gapbox1.height = 6;
+				mmlTitle.height = 0;
+				gapbox2.height = 0;
+				mmlComment.height = 0;
+				gapbox3.height = 0;
+				playlist.percentHeight = 100;
+				gapbox4.height = 0;
+				vdivbox.height = 0;
+				input.height = 0;
+				warnings.height = 0;
+				input.verticalScrollPosition = 0;
+				warnings.verticalScrollPosition = 0;
+				
+				startTick_ti.text = "0";
+				startTick_l1.visible = false;
+				startTick_ti.visible = false;
+				startTick_l2.visible = false;
+				
+				playlist.visible = true;
+				input.visible = false;
+				warnings.visible = false;
+				vdivbox.visible = false;
+				
+				m_uiMode = MODE_DISP_BROWSE;
+			}
+		}
+		public function toDispAndMML():void {
+			if (m_uiMode != MODE_DISP_MML) {
+				statusBox.height = Number(KEYDISP_HEIGHT + 2);
+				statusDisp.height = Number(KEYDISP_HEIGHT);
+				gapbox1.height = 6;
+				mmlTitle.height = 0;
+				gapbox2.height = 0;
+				mmlComment.height = 0;
+				gapbox3.height = 0;
+				playlist.height = 0;
+				gapbox4.height = 0;
+				vdivbox.percentHeight = 100;
+				input.percentHeight = 88;
+				warnings.percentHeight = 12;
+				input.verticalScrollPosition = 0;
+				warnings.verticalScrollPosition = 0;
+				
+				startTick_ti.text = "0";
+				startTick_l1.visible = true;
+				startTick_ti.visible = true;
+				startTick_l2.visible = true;
+				
+				playlist.visible = false;
+				input.visible = true;
+				warnings.visible = true;
+				vdivbox.visible = true;
+				
+				m_uiMode = MODE_DISP_MML;
+			}
+		}
+		public function toBrowse():void {
+			if (m_uiMode != MODE_BROWSE_ONLY) {
+				statusBox.height = 0;
+				statusDisp.height = 0;
+				gapbox1.height = 0;
+				mmlTitle.height = 26;
+				gapbox2.height = 6;
+				mmlComment.height = 26;
+				gapbox3.height = 6;
+				playlist.percentHeight = 100;
+				gapbox4.height = 0;
+				input.height = 0;
+				warnings.height = 0;
+				vdivbox.height = 0;
+				
+				startTick_ti.text = "0";
+				startTick_l1.visible = false;
+				startTick_ti.visible = false;
+				startTick_l2.visible = false;
+				
+				playlist.visible = true;
+				input.visible = false;
+				warnings.visible = false;
+				vdivbox.visible = false;
+				
+				m_uiMode = MODE_BROWSE_ONLY;
+			}
+		}
+		public function toMMLEdit():void {
+			if (m_uiMode != MODE_MML_ONLY) {
+				statusBox.height = 0;
+				statusDisp.height = 0;
+				gapbox1.height = 0;
+				mmlTitle.height = 0;
+				gapbox2.height = 0;
+				mmlComment.height = 0;
+				gapbox3.height = 0;
+				playlist.height = 0;
+				gapbox4.height = 0;
+				vdivbox.percentHeight = 100;
+				input.percentHeight = 90;
+				warnings.percentHeight = 10;
+				input.verticalScrollPosition = 0;
+				warnings.verticalScrollPosition = 0;
+				
+				startTick_ti.text = "0";
+				startTick_l1.visible = true;
+				startTick_ti.visible = true;
+				startTick_l2.visible = true;
+				
+				playlist.visible = false;
+				input.visible = true;
+				warnings.visible = true;
+				vdivbox.visible = true;
+				
+				m_uiMode = MODE_MML_ONLY;
+			}
+		}
+		public function toBrowseAndMML():void {
+			if (m_uiMode != MODE_BROWSE_MML) {
+				statusBox.height = 0;
+				statusDisp.height = 0;
+				gapbox1.height = 0;
+				mmlTitle.height = 26;
+				gapbox2.height = 6;
+				mmlComment.height = 26;
+				gapbox3.height = 6;
+				playlist.percentHeight = 45;
+				gapbox4.height = 6;
+				vdivbox.percentHeight = 55;
+				input.percentHeight = 90;
+				warnings.percentHeight = 10;
+				input.verticalScrollPosition = 0;
+				warnings.verticalScrollPosition = 0;
+				
+				startTick_ti.text = "0";
+				startTick_l1.visible = true;
+				startTick_ti.visible = true;
+				startTick_l2.visible = true;
+				
+				playlist.visible = true;
+				input.visible = true;
+				warnings.visible = true;
+				vdivbox.visible = true;
+				
+				m_uiMode = MODE_BROWSE_MML;
 			}
 		}
 
-		public function stop():void {
-			player.stop();
-			playButton.label = "Play";
-			m_timer.reset();
-			progress.text = "";
-			voiceCount.text = "";
-		}
-
 		public function onComplete(e:Event):void {
-			playButton.label = "Play";
-			m_timer.reset();
+			togglePlayButton.label = "Play";
 			progress.text = "";
-			voiceCount.text = "";
 		}
 
 		public function onBuffering(e:MMLEvent):void {
 			if (e.progress < 100) {
 				progress.text = "Buffering " + e.progress + "%";
-				voiceCount.text = "";
 			}
 			else {
-				onSecond(e);
-				m_timer.start();
+				//音声の発音開始直後の初期設定処理
+				m_totaltimeStr = player.getTotalTimeStr();
 			}
 		}
 
-		public function onSecond(e:Event):void {
-			progress.text = player.getNowTimeStr() + " / " + player.getTotalTimeStr();
-			//progress.text = player.getNowTimeStr();
-			//voiceCount.text = "♪" + player.getVoiceCount();
+		private static const s_OctName:Vector.<String> = Vector.<String>([
+			"o0","o1","o2","o3","o4","o5","o6","o7","o8","o9","o10","o11","o12","o13","o14","o15",
+		]);
+		private static const s_NoteName:Vector.<String> = Vector.<String>([
+			"C ","D-","D ","E-","E ","F ","G-","G ","A-","A ","B-","B ",
+		]);
+		private function notenumTOname(note:Number, on:Number):String {
+			var o:int;
+			var n:int;
+			if (note >= 0.0) {
+				o = int(note)/12;
+				if (o > 10) o = 10;
+				n = int(note) % 12;
+			}
+			else {
+				o = 0;
+				n = 0;
+			}
+			return s_OctName[o]+((on==0.0)?" ":"*")+s_NoteName[n];
+		}
+		private function getTimeStr(msec:Number):String {
+			var sec:Number = Math.ceil(msec / 1000.0);
+			if (sec >= 86400.0) return "over24h";
+			var shour:String = "0" + String(int(sec / 3600.0));
+			var smin:String  = "0" + String(int((sec / 60.0) % 60.0));
+			var ssec:String  = "0" + String(int(sec % 60.0));
+			return shour.substr(shour.length - 2, 2) + ":" + smin.substr(smin.length - 2, 2) + ":" + ssec.substr(ssec.length - 2, 2);
+		}
+		private function seqTrackInfo():void {
+			var f:Boolean;
+			var t:Number;
+			// 時間表示
+			t = player.getNowMSec();
+			m_now_sec = Math.ceil(t / 1000.0);
+			if (m_now_sec != m_last_sec) {
+				progress.text = getTimeStr(t) + " / " + m_totaltimeStr;
+				m_last_sec = m_now_sec;
+			}
+			// ステータスシーケンス（１フレーム分）
+			player.sequenceTrackInfo(t);
+		}
+		
+		public function setup() : void {
+			var tr:int, i:int, j:int, x:Number;
+			var stx:int, sty:int;
+			var bw:Array = [0,1,0,1,0,0,1,0,1,0,1,0];
+			var g:Graphics;
+			
+			container = statusDisp;
+			container.scrollRect = new Rectangle(0,0,KEYDISP_WIDTH,KEYDISP_HEIGHT);		//表示領域の制限
+			
+			for (i=0; i<TRACK_MAX; i++) {
+				noteOnRect[i] = new Vector.<Rectangle>(KEY_MAX);
+				
+				//レガシーパンポット用矩形の定義
+				lgPanRect[i] = new Vector.<Rectangle>(3);				// L/C/Rの３個
+				stx = TOP_W_OFS + ((KEY_W_W*7*OCT_MAX) + KEY_W_W);		//キーボードの右端
+				sty = (TOP_H_OFS + (i*KEY_HEIGHT) - 4);					//キーボードの上端-4
+				lgPanRect[i][0] =  new Rectangle(stx-(10+10+8), sty, 8, 3 );		//28
+				lgPanRect[i][1] =  new Rectangle(stx-(   10+8), sty, 8, 3 );
+				lgPanRect[i][2] =  new Rectangle(stx-(      8), sty, 8, 3 );
+				
+				//パンポット用矩形の定義
+				panRect[i] = new Vector.<Rectangle>(2);					// 下地、ポインタ の２個
+				panRect[i][0] =  new Rectangle(stx-( 118), sty, 80, 3 );		//28+10+width
+				panRect[i][1] =  new Rectangle(stx-(78-2), sty,  4, 3 );		//start-width/2-2
+				
+				//音量用矩形の定義
+				stx = TOP_W_OFS;										//キーボードの左端
+				volRect[i] = new Vector.<Rectangle>(2);					// 下地、バー の２個
+				volRect[i][0] =  new Rectangle(stx, sty, 100, 3 );
+				volRect[i][1] =  new Rectangle(stx, sty,   0, 3 );
+				
+				//未使用トラックのマスク用矩形の定義
+				trackStatusKeyboadMask[i] = new Rectangle(
+					TOP_W_OFS,
+					(TOP_H_OFS + (i*KEY_HEIGHT)),
+					((KEY_W_W*7*OCT_MAX) + KEY_W_W),
+					(KEY_W_H+1)
+				);
+				
+				//ステータスの文字表示領域の定義
+				trackStatusLabel[i] = new Vector.<Label>(3);
+				trackStatusLabel[i][0] = new Label();
+				trackStatusLabel[i][1] = new Label();
+				trackStatusLabel[i][2] = new Label();
+			}
+			
+			//白鍵
+			g = keyShape.graphics;
+			g.lineStyle(1, 0x686868);	//白鍵の線の色１
+			g.drawPath(Vector.<int>([1,2,2]), Vector.<Number>([0,0, 0,Number(KEY_W_H), Number(KEY_W_W-1),Number(KEY_W_H)]));
+			g.lineStyle(1, 0xd0d0d0);	//白鍵の線の色２
+			g.drawPath(Vector.<int>([1,2,2]), Vector.<Number>([Number(KEY_W_W-1),Number(KEY_W_H), Number(KEY_W_W-1),0, 1,0]));
+			for (tr=0; tr<TRACK_MAX; tr++) {
+				//白鍵の下地
+				rc.setTo( TOP_W_OFS, (TOP_H_OFS + (tr*KEY_HEIGHT)), ((KEY_W_W*7*OCT_MAX) + KEY_W_W), (KEY_W_H) );
+				keyImage.fillRect(rc, 0xf0f0f0);
+				//白鍵の形状
+				for (	mat.setTo(1,0,0,1, TOP_W_OFS, (TOP_H_OFS + (tr*KEY_HEIGHT)));
+						mat.tx<(TOP_W_OFS + (KEY_W_W*7*OCT_MAX) + KEY_W_W);
+						mat.tx+=KEY_W_W
+				) {
+					keyImage.draw(keyShape, mat);
+				}
+			}
+			
+			//黒鍵
+			g.clear();
+			g.beginFill(0x202020);
+			g.lineStyle(1, 0x404040);
+			g.drawPath(Vector.<int>([1,2,2,2]), Vector.<Number>([0,0, 0,Number(KEY_B_H-1), Number(KEY_B_W-1),Number(KEY_B_H-1), Number(KEY_B_W-1),0]));
+			g.endFill();
+			g.lineStyle(1, 0x707070);
+			g.drawPath(Vector.<int>([1,2,2]), Vector.<Number>([1,0, 1,Number(KEY_B_H-3), 2,Number(KEY_B_H-3)]));
+			for (i=0,x=0; i<KEY_MAX; i++) {
+				var bwf:int = bw[i%12];
+				for (tr=0; tr<TRACK_MAX; tr++) {
+					//ノートオン用マークの領域設定
+					noteOnRect[tr][i] = new Rectangle(
+						Number(TOP_W_OFS+x+2),
+						Number((TOP_H_OFS + (tr*KEY_HEIGHT)) + KEY_MK_OFS[bwf] ),
+						Number(KEY_B_W-2),
+						Number(KEY_MK_SIZE)
+					);
+					//黒鍵の描画
+					if (bwf) {
+						mat.ty = (TOP_H_OFS + (tr*KEY_HEIGHT));
+						mat.tx = TOP_W_OFS+x+1;
+						keyImage.draw(keyShape, mat);
+					}
+				}
+				x += (bwf == bw[(i+1)%12])?6:3;
+			}
+			
+			//全トラックのマスク状態でスタンバイ
+			keyOnImage.fillRect(keyOnImage.rect, 0x00000000);
+			for (tr=0; tr<TRACK_MAX; tr++) {
+				keyOnImage.fillRect( trackStatusKeyboadMask[tr], ((160)<<24)|0x000000 );
+			}
+			
+			//鍵盤表示の実装
+			with(container.addChild(new Bitmap(keyImage))) { x=0; y=0; }
+			//ノートオン印の実装
+			with(container.addChild(new Bitmap(keyOnImage))) { x=0; y=0; }
+			
+			//トラック番号の実装
+			for (tr=0; tr<TRACK_MAX; tr++) {
+				with(statusBox.addChild(trackStatusLabel[tr][0])) { x=3; y=(TOP_H_OFS + (tr*KEY_HEIGHT) + 4); }
+			}
+			//シーケンス情報の実装
+			for (tr=0; tr<TRACK_MAX; tr++) {
+				with(statusBox.addChild(trackStatusLabel[tr][1])) { x=(KEYDISP_WIDTH+3); y=(TOP_H_OFS + (tr*KEY_HEIGHT) - 3); }
+				with(statusBox.addChild(trackStatusLabel[tr][2])) { x=(KEYDISP_WIDTH+3); y=(TOP_H_OFS + (tr*KEY_HEIGHT) + 11); }
+			}
+			//固定位置ラベルの実装
+			with(statusBox.addChild(trackStatusL_Tr)) { text="Tr"; x=3; y=0; }
+			with(statusBox.addChild(trackStatusL_Tempo)) { x=(KEYDISP_WIDTH+3); y=0; }
+			with(statusBox.addChild(trackStatusL_Title)) { x=3; y=(KEYDISP_HEIGHT-BTM_H_OFS-8); }
+			
+			//垂直同期割込処理の登録
+			container.addEventListener(Event.ENTER_FRAME, seqAtFrame);
+		}
+		
+		public function resetKeyDisp():void {
+			var i:int;
+			var StTrk:int;
+			
+			keyOnImage.fillRect(keyOnImage.rect, 0x00000000);
+			
+			StTrk = (player.getTotalTrackNum() - 1);		//tempoトラックを除く本数
+			if (StTrk < 0) StTrk = 0;
+			if (StTrk < TRACK_MAX) {
+				for (i=StTrk; i<TRACK_MAX; i++) {
+					keyOnImage.fillRect( trackStatusKeyboadMask[i], ((160)<<24)|0x000000 );
+				}
+				refreshRc.setTo(
+					0,
+					0,
+					KEYDISP_WIDTH,
+					TOP_H_OFS + (KEY_HEIGHT*StTrk)
+				);
+			}
+			else {
+				refreshRc.setTo(0, 0, KEYDISP_WIDTH, KEYDISP_HEIGHT);
+			}
+		}
+		
+		private function limitNum(min:Number, max:Number, num:Number):Number {
+			if (num < min) return min;
+			else if (num > max) return max;
+			else return num;
+		}
+		private function limitNumI(min:int, max:int, num:int):int {
+			if (num < min) return min;
+			else if (num > max) return max;
+			else return num;
+		}
+		private function pInt02d(num:Number):String {
+			if (num < 0.0) {
+				return ("--");
+			}
+			else if (num < 10.0) {
+				return (String(num) + " ");
+			}
+			else if (num < 100.0) {
+				return String(num);
+			}
+			else {
+				return ("++");
+			}
+		}
+		private function pInt03d(num:Number):String {
+			if (num < 0.0) {
+				return ("---");
+			}
+			else if (num < 10.0) {
+				return (String(num) + "  ");
+			}
+			else if (num < 100.0) {
+				return (String(num) + " ");
+			}
+			else if (num < 1000.0) {
+				return String(num);
+			}
+			else {
+				return ("+++");
+			}
+		}
+		private function pNumf2(num:Number):Number {
+			return (Math.round(num*100.0) / 100.0);
+		}
+		private function pNumf5(num:Number):Number {
+			return (Math.round(num*100000.0) / 100000.0);
+		}
+		private function drawKeyDisp():void {
+			var o:Number = 6.0;
+			var w:Number;
+			var tr:int;
+			var i:int, j:int, max:int;
+			var param:int, paramN:Number;
+			var wMod:Number, wModSub:Number, poly:Number;
+			var pwmP:Number;
+			var n:Vector.<Number>, nr:Vector.<Rectangle>;
+			
+			if (m_uiMode > MODE_DISP_MML) return;
+			if (player.getNowMSec() < DELAY_DSP) return;
+			
+			//Title
+			w = statusBox.width - o;
+			if (w < 0.0) w = 0.0;
+			if (trackStatusL_Title.width != w) { trackStatusL_Title.width = w; }
+			//Tempo
+			w = statusBox.width - (KEYDISP_WIDTH+3) - o ;
+			if (w < 0.0) w = 0.0;
+			if (trackStatusL_Tempo.width != w) { trackStatusL_Tempo.width = w; }
+			trackStatusL_Tempo.text = "TEMPO:" + pNumf5(player.getTrackInfo(1)[FlMML.TSTAT_BPM]);
+			//TrackStatus
+			for (i=0; i<TRACK_MAX; i++) {
+				tr = i + m_trackOfs;
+				w = statusBox.width - (KEYDISP_WIDTH+3) - o ;
+				if (w < 0.0) w = 0.0;
+				if (trackStatusLabel[i][1].width != w) { trackStatusLabel[i][1].width = w; }
+				if (trackStatusLabel[i][2].width != w) { trackStatusLabel[i][2].width = w; }
+				if (player.isExistTrackInfo(tr) == true) {
+					wMod = player.getTrackInfo(tr)[FlMML.TSTAT_FORM];
+					wModSub = player.getTrackInfo(tr)[FlMML.TSTAT_SUBFORM];
+					pwmP = player.getTrackInfo(tr)[FlMML.TSTAT_PWM];
+					poly = player.getTrackInfo(tr)[FlMML.TSTAT_POLY];
+					trackStatusLabel[i][1].text = 
+						"@@" + pInt02d(wMod) +
+						" @" + pInt03d(wModSub) +
+						((poly>1.0) ? (" [POLY:"+poly+"]"):"") +
+						" mv" + pNumf5(player.getTrackInfo(tr)[FlMML.TSTAT_MIXVOL]) +
+						" vs" + player.getTrackInfo(tr)[FlMML.TSTAT_VMODE_MAX] + "," +
+						pNumf5(player.getTrackInfo(tr)[FlMML.TSTAT_VMODE_RT]) + "," +
+						player.getTrackInfo(tr)[FlMML.TSTAT_VMODE_VZ] +
+						" @p" + pNumf2(player.getTrackInfo(tr)[FlMML.TSTAT_PAN]) +
+						" p" + player.getTrackInfo(tr)[FlMML.TSTAT_PANLG] +
+						((player.getTrackInfo(tr)[FlMML.TSTAT_DELAY]!=0.0) ? " [@dly]" : "") +
+						((player.getTrackInfo(tr)[FlMML.TSTAT_FADE]==0.0) ? " [@fo]" : "") +
+						((player.getTrackInfo(tr)[FlMML.TSTAT_FADE]==1.0) ? " [@fi]" : "")
+						;
+					trackStatusLabel[i][2].text = 
+						notenumTOname(player.getTrackInfo(tr)[FlMML.TSTAT_NOTE], player.getTrackInfo(tr)[FlMML.TSTAT_NOTE_ON]) +
+						" @d" + pNumf5(player.getTrackInfo(tr)[FlMML.TSTAT_DETUNE]) + "," +
+						player.getTrackInfo(tr)[FlMML.TSTAT_P_RESO] +
+						" v" + pNumf5(player.getTrackInfo(tr)[FlMML.TSTAT_VOL]) +
+						( ((wMod==3.0)&&(wModSub!=2.0) ) ? ((pwmP>=0.0) ? " @w" + pNumf5(pwmP) : " [@we]") : "" ) + 
+						( ((wMod==7.0) || ( (wMod==3.0)&&((wModSub==1.0)||(wModSub==2.0)) )) ? " @n" + player.getTrackInfo(tr)[FlMML.TSTAT_NOISE_PSG] + ",7" : "" ) + 
+						( (wMod==4.0) ? " @n" + player.getTrackInfo(tr)[FlMML.TSTAT_NOISE_W] + ",4" : "" ) + 
+						( (wMod==5.0) ? " @n" + player.getTrackInfo(tr)[FlMML.TSTAT_NOISE_FC] + ",5" : "" ) + 
+						( (wMod==6.0) ? " @n" + player.getTrackInfo(tr)[FlMML.TSTAT_NOISE_GB] + ",6" : "" ) + 
+						((player.getTrackInfo(tr)[FlMML.TSTAT_LFO_P]!=0.0) ? " [@lp]" : "") +
+						((player.getTrackInfo(tr)[FlMML.TSTAT_LFO_A]!=0.0) ? " [@la]" : "") +
+						((player.getTrackInfo(tr)[FlMML.TSTAT_LFO_B]!=0.0) ? " [@lb]" : "") +
+						((player.getTrackInfo(tr)[FlMML.TSTAT_LFO_F]!=0.0) ? " [@lf]" : "") +
+						((player.getTrackInfo(tr)[FlMML.TSTAT_LFO_Y]!=0.0) ? " [@ly]" : "") +
+						((player.getTrackInfo(tr)[FlMML.TSTAT_FM_HLFO]==1.0) ? " [@mh]" : "") +
+						((player.getTrackInfo(tr)[FlMML.TSTAT_FM_HLFO]==2.0) ? " [@mha]" : "") +
+						((player.getTrackInfo(tr)[FlMML.TSTAT_LPF]!=0.0) ? " [@f]" : "") +
+						((player.getTrackInfo(tr)[FlMML.TSTAT_FORMANT]>=0.0) ? " [@'']" : "") +
+						((player.getTrackInfo(tr)[FlMML.TSTAT_MIDIPORT]!=0.0) ? " [@u1]" : "")
+						;
+				}
+				else {
+					trackStatusLabel[i][1].text = "";
+					trackStatusLabel[i][2].text = "";
+				}
+			}
+			
+			//KeyBoad
+			keyOnImage.fillRect(refreshRc, 0x00000000);
+			for (i=0; i<TRACK_MAX; i++) {
+				tr = i + m_trackOfs;
+				if (player.isExistTrackInfo(tr) == true) {
+					if (player.isPolyTrack(tr) == false) {
+						//monoモード時
+						keyOnImage.fillRect(
+							noteOnRect[i][ int(player.getTrackInfo(tr)[FlMML.TSTAT_NOTE_NOW]) ],
+							((255)<<24)|KEY_NOW_COLOR
+						);
+						keyOnImage.fillRect(
+							noteOnRect[i][ int(player.getTrackInfo(tr)[FlMML.TSTAT_NOTE]) ],
+							((255 - ((160) * int(1.0 - player.getTrackInfo(tr)[FlMML.TSTAT_NOTE_ON])) )<<24)|KEY_ON_COLOR
+						);
+					}
+					else {
+						//polyモード時
+						n = player.getTrackPolyNoteOn(tr);
+						nr = noteOnRect[i];
+						max = FlMML.TSTAT_NOTE_MAX;
+						for (j=0; j<max; j++) {
+							if (n[j] > 0.0) {
+								keyOnImage.fillRect( nr[j], ((n[j]*255)<<24)|KEY_ON_COLOR );
+							}
+						}
+					}
+					//レガシーパンポット
+					param = int( player.getTrackInfo(tr)[FlMML.TSTAT_PANLG] );
+					keyOnImage.fillRect(lgPanRect[i][0], (255<<24)|((param==(-1))?INDI_COL_LGPAN:INDI_COL_OFF) );
+					keyOnImage.fillRect(lgPanRect[i][1], (255<<24)|((param==( 0))?INDI_COL_LGPAN:INDI_COL_OFF) );
+					keyOnImage.fillRect(lgPanRect[i][2], (255<<24)|((param==( 1))?INDI_COL_LGPAN:INDI_COL_OFF) );
+					//パンポット
+					keyOnImage.fillRect(panRect[i][0], (255<<24)|(INDI_COL_OFF) );
+					paramN = panRect[i][0].x + (40.0-2.0) + ((player.getTrackInfo(tr)[FlMML.TSTAT_PAN_NOW] * (40.0-2.0) / 100.0));
+					panRect[i][1].x = paramN;
+					keyOnImage.fillRect(panRect[i][1], (255<<24)|(INDI_COL_PAN_NOW) );
+					paramN = panRect[i][0].x + (40.0-2.0) + ((player.getTrackInfo(tr)[FlMML.TSTAT_PAN] * (40.0-2.0) / 100.0));
+					panRect[i][1].x = paramN;
+					keyOnImage.fillRect(panRect[i][1], (255<<24)|(INDI_COL_PAN) );
+					//音量
+					paramN = (player.getTrackInfo(tr)[FlMML.TSTAT_VOL] / player.getTrackInfo(tr)[FlMML.TSTAT_VMODE_MAX]) * 100.0;
+					volRect[i][1].width = paramN;
+					keyOnImage.fillRect(volRect[i][0], (255<<24)|(INDI_COL_OFF) );
+					keyOnImage.fillRect(volRect[i][1], (255<<24)|(INDI_COL_VOL) );
+				}
+			}
+		}
+		
+		public function seqAtFrame(e:Event):void {
+			if (player.isPlaying() == false) return;
+			
+			seqTrackInfo();
+			drawKeyDisp();
+		}
+		
+		private function setTrackOfs(ofs:int):void {
+			var i:int;
+			var Trk:int;
+			
+			if (player.isWorking() == false) return;
+			
+			Trk = player.getTotalTrackNum() - 1;	//tempoトラックを数から除く本数
+			if (Trk < 0) Trk = 0;
+			
+			if (Trk >= TRACK_MAX) {
+				if (
+					((m_trackOfs+ofs+TRACK_MAX) <= player.getTotalTrackNum()) &&
+					((m_trackOfs+ofs) >= 1)
+				) {
+					m_trackOfs += ofs;
+					for (i=0; i<TRACK_MAX; i++) {
+						if (player.isExistTrackInfo(i+m_trackOfs) == true) {
+							trackStatusLabel[i][0].text = (((i+m_trackOfs)<10)?"0":"") + String(i+m_trackOfs);
+						}
+					}
+				}
+			}
+			else {
+				if (ofs == 0) {
+					for (i=0; i<TRACK_MAX; i++) {
+						trackStatusLabel[i][0].text = "";
+					}
+					for (i=0; i<Trk; i++) {
+						if (player.isExistTrackInfo(i+m_trackOfs) == true) {
+							trackStatusLabel[i][0].text = (((i+m_trackOfs)<10)?"0":"") + String(i+m_trackOfs);
+						}
+					}
+				}
+			}
 		}
 	]]>
 	</mx:Script>
 
-	<mx:Panel width="100%" height="100%" borderVisible="true" cornerRadius="0" creationPolicy="all"
-			  dropShadowVisible="false" paddingBottom="0" paddingLeft="10" paddingRight="10"
-			  paddingTop="10" title="FlMML customized">
-
-		<mx:TabNavigator id="tn" width="100%" height="100%" borderVisible="true" cornerRadius="0"
-						 dropShadowVisible="false" paddingBottom="8" paddingLeft="8"
-						 paddingRight="8" paddingTop="8">
-
-			<mx:VBox label="BROWSER">
-				<mx:Box direction="horizontal" width="100%" height="25">
-					<mx:TextInput id="currentTitle" width="100%" height="100%" editable="false" text="Title">
-					</mx:TextInput>
-				</mx:Box>
-				<mx:Box direction="horizontal" width="100%" height="25">
-					<mx:TextInput id="currentComment" width="100%" height="100%" editable="false" text="Comment">
-					</mx:TextInput>
-				</mx:Box>
-				<mx:Box direction="horizontal" width="100%" height="50">
-					<mx:TextArea id="warnings" width="100%" height="100%" fontSize="12" editable="false" text="">
-					</mx:TextArea>
-				</mx:Box>
-				<mx:Box direction="horizontal" width="100%" height="100%">
-					<mx:DataGrid id="playlist" width="100%" height="100%" dataProvider="{m_playlist}"
-								 doubleClickEnabled="true" dropShadowVisible="false" editable="false"
-								 fontSize="14" itemClick="openPlayItem(event);" showHeaders="false"
-								 sortableColumns="false"/>
-				</mx:Box>
-			</mx:VBox>
-
-			<mx:VBox label="MML-EDIT">
-				<mx:VDividedBox width="100%" height="100%">
-					<mx:TextArea id="input" width="100%" height="90%" fontSize="14" text="/*MML*/  L8 O5 CDEFGAB&gt;C">
-					</mx:TextArea>
-					<mx:TextArea id="warnings2" width="100%" height="10%" fontSize="12" editable="false" text="">
-					</mx:TextArea>
-				</mx:VDividedBox>
-			</mx:VBox>
-
-		</mx:TabNavigator>
-
-		<mx:Box direction="horizontal" width="100%" height="45" verticalAlign="middle">
-			<mx:Button id="playButton" label="Play" click="play();" height="35" />
-			<mx:Button id="stopButton" label="Stop" click="stop();" height="35" />
-			<mx:Label text=" " width="25" />
-			<mx:Label id="progress" text="" width="150" textAlign="center"/>
-			<mx:Label id="voiceCount" text="" width="30" textAlign="center"/>
-			<mx:Label text=" " width="100%" />
-			<mx:Label text="Volume:" fontSize="12" fontWeight="bold" textAlign="right"/>
-			<mx:HSlider id="hSlider" width="120" allowTrackClick="true"
-						change="player.setMasterVolume(hSlider.value);" dataTipPlacement="top"
-						labelOffset="0" labels="['min','max']" liveDragging="true" maximum="100"
-						minimum="0" snapInterval="1" tickColor="black" value="100"/>
-			<mx:Label text=" " width="10" />
-		</mx:Box>
-
+	<mx:VBox id="parentVBox" width="100%" height="100%"
+			 contentBackgroundColor="{SUB_COLOR}"
+			 paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" verticalGap="0">
+		
 		<flmml:FlMML id="player" />
-
-	</mx:Panel>
+		
+		<mx:HBox id="controlboxTOP" width="100%" height="36" color="#000000" backgroundColor="#e0e0e0"
+				 borderStyle="none" borderVisible="false" verticalAlign="middle" horizontalGap="0">
+			
+			<mx:Label text=" " width="10" />
+			<mx:Label id="AppTitle" fontSize="14" fontWeight="bold" text="FlMML customized"/>
+			
+			<mx:Label text=" " width="16" />
+			<mx:ComboBox id="screenMenu" editable="false" dataProvider="{m_menu}" close="changeScreenMode(event);" selectedIndex="0">
+			</mx:ComboBox>
+			
+			<mx:Label text=" " width="12" />
+			<mx:Label id="startTick_l1" fontSize="12" text="begin at" textAlign="right" />
+			<mx:Label text=" " width="2" />
+			<mx:TextInput id="startTick_ti" width="54" text="0" textAlign="right"/>
+			<mx:Label text=" " width="2" />
+			<mx:Label id="startTick_l2" fontSize="12" text="tick(s)" />
+			
+			<mx:Label text=" " width="100%" />
+		</mx:HBox>
+		
+		<mx:VBox id="mainVBox" width="100%" height="100%" paddingBottom="10" paddingLeft="10"
+				 paddingRight="10" paddingTop="10" verticalGap="0">
+			
+			<mx:Canvas id="statusBox" width="100%" height="{KEYDISP_HEIGHT+2}" borderStyle="inset" borderVisible="true"
+					   styleName="UserText" fontSize="12" color="#ffffff" backgroundColor="{KD_BGCOLOR}"
+					   verticalScrollPolicy="off" horizontalScrollPolicy="off">
+				<mx:UIComponent id="statusDisp" width="100%" height="100%" x="0" y="0">
+				</mx:UIComponent>
+				<mx:LinkButton label="[-]" fontSize="10" labelVerticalOffset="0" x="28" y="0" height="15" click="setTrackOfs(-1);"/>
+				<mx:LinkButton label="[+]" fontSize="10" labelVerticalOffset="0" x="64" y="0" height="15" click="setTrackOfs(1);"/>
+			</mx:Canvas>
+			<mx:VBox id="gapbox1" width="100%" height="0" borderStyle="none" borderVisible="false"></mx:VBox>
+			
+			<mx:TextInput id="mmlTitle" width="100%" height="0" editable="false" fontSize="15" text="Title" ></mx:TextInput>
+			<mx:VBox id="gapbox2" width="100%" height="0" borderStyle="none" borderVisible="false"></mx:VBox>
+			
+			<mx:TextInput id="mmlComment" width="100%" height="0" editable="false" fontSize="15" text="Comment" ></mx:TextInput>
+			<mx:VBox id="gapbox3" width="100%" height="0" borderStyle="none" borderVisible="false"></mx:VBox>
+			
+			<mx:DataGrid id="playlist" width="100%" height="100%"
+						 alternatingItemColors="[#f7f7f7,#efefef]" borderVisible="true"
+						 dataProvider="{m_playlist}" doubleClickEnabled="true" editable="false"
+						 itemClick="openPlayItem(event);"
+						 showHeaders="false" sortableColumns="false"/>
+			<mx:VBox id="gapbox4" width="100%" height="6" borderStyle="none" borderVisible="false"></mx:VBox>
+			
+			<mx:VDividedBox id="vdivbox" width="100%" height="0" borderStyle="none" borderVisible="false"
+							paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0">
+				
+				<mx:TextArea id="input" width="100%" height="0" borderVisible="true"
+							 fontSize="14" text="/*MML*/  L8 O5 CDEFGAB&gt;C">
+				</mx:TextArea>
+				
+				<mx:TextArea id="warnings" width="100%" height="0" borderVisible="true"
+							 editable="false" fontSize="12" text="">
+				</mx:TextArea>
+				
+			</mx:VDividedBox>
+			
+			<mx:VBox id="gapboxBTM" width="100%" height="10" borderStyle="none" borderVisible="false"></mx:VBox>
+			
+			<mx:HBox id="controlboxBTM" width="100%" height="36" borderStyle="none" borderVisible="false"
+					 verticalAlign="middle">
+				<mx:Button id="togglePlayButton" height="36" label="Play" click="togglePlay();" fontSize="14"/>
+				<mx:Label text=" " width="12" />
+				<mx:Label id="progress" text="" width="150" textAlign="center"/>
+				<mx:Label text=" " width="100%" />
+				<mx:HBox fontSize="12" fontWeight="bold">
+					<mx:HSlider id="hSlider" width="120" allowTrackClick="true"
+								change="player.setMasterVolume(hSlider.value);" dataTipPlacement="top"
+								labelOffset="0" labels="['','Volume','']" liveDragging="true" maximum="100"
+								minimum="0" snapInterval="1" tickColor="black" value="100"/>
+				</mx:HBox>
+			</mx:HBox>
+			
+		</mx:VBox>
+		
+	</mx:VBox>
 
 </mx:Application>

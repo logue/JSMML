@@ -16,7 +16,11 @@
 		}
 
 		public function addPhase(time:int):void {
+			if (time <= 0) return;
 			m_phase = (m_phase + (m_freqShift * Number(time))) % (1.0);
+		}
+
+		public function addPShift(sample:int):void {
 		}
 
 		public function getNextSample():Number {

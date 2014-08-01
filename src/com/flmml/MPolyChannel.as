@@ -15,8 +15,8 @@
 		protected var m_voiSeqId:Vector.<Vector.<int>>;	// m_voicesごとのシーケンスID
 		// 予約コマンドコード
 		protected static const C_setDetune:int			= 0;
-		protected static const C_setEnvTimeUnit:int		= 1;
-		protected static const C_setLfoResolution:int	= 2;
+		protected static const C_setEnvSptUnit:int		= 1;
+		protected static const C_setLfoSptUnit:int		= 2;
 		protected static const C_setMixingVolume:int	= 3;
 		protected static const C_setVolMode:int			= 4;
 		protected static const C_setVolume:int			= 5;
@@ -25,18 +25,19 @@
 		protected static const C_setForm:int			= 8;
 		protected static const C_setSubForm:int			= 9;
 		protected static const C_setPhaseRMode:int		= 10;
-		protected static const C_setEnvelope:int		= 11;
-		protected static const C_setLFO:int				= 12;
-		protected static const C_setLFOrestart:int		= 13;
-		protected static const C_setLPF:int				= 14;
-		protected static const C_setFormant:int			= 15;
-		protected static const C_setPWM:int				= 16;
-		protected static const C_setOPMHwLfo:int		= 17;
-		protected static const C_setPortamento:int		= 18;
-		protected static const C_setMidiPort:int		= 19;
-		protected static const C_setMidiPortRate:int	= 20;
-		protected static const C_setPortBase:int		= 21;
-		protected static const C_MAX:int				= 22;
+		protected static const C_setOptionClock:int		= 11;
+		protected static const C_setEnvelope:int		= 12;
+		protected static const C_setLFO:int				= 13;
+		protected static const C_setLFOrestart:int		= 14;
+		protected static const C_setLPF:int				= 15;
+		protected static const C_setFormant:int			= 16;
+		protected static const C_setPWM:int				= 17;
+		protected static const C_setOPMHwLfo:int		= 18;
+		protected static const C_setPortamento:int		= 19;
+		protected static const C_setMidiPort:int		= 20;
+		protected static const C_setMidiPortRate:int	= 21;
+		protected static const C_setPortBase:int		= 22;
+		protected static const C_MAX:int				= 23;
 		
 		public function MPolyChannel(voiceLimit:int) {
 			var i:int, j:int;
@@ -95,13 +96,13 @@
 				vo.setDetune(m_setDetune_a, m_setDetune_b);
 				m_voiSeqId[vi][C_setDetune] = m_mstSeqId[C_setDetune];
 			}
-			if (m_voiSeqId[vi][C_setEnvTimeUnit] != m_mstSeqId[C_setEnvTimeUnit]) {
-				vo.setEnvTimeUnit(m_setEnvTimeUnit_a);
-				m_voiSeqId[vi][C_setEnvTimeUnit] = m_mstSeqId[C_setEnvTimeUnit];
+			if (m_voiSeqId[vi][C_setEnvSptUnit] != m_mstSeqId[C_setEnvSptUnit]) {
+				vo.setEnvSptUnit(m_setEnvSptUnit_a);
+				m_voiSeqId[vi][C_setEnvSptUnit] = m_mstSeqId[C_setEnvSptUnit];
 			}
-			if (m_voiSeqId[vi][C_setLfoResolution] != m_mstSeqId[C_setLfoResolution]) {
-				vo.setLfoResolution(m_setLfoResolution_a);
-				m_voiSeqId[vi][C_setLfoResolution] = m_mstSeqId[C_setLfoResolution];
+			if (m_voiSeqId[vi][C_setLfoSptUnit] != m_mstSeqId[C_setLfoSptUnit]) {
+				vo.setLfoSptUnit(m_setLfoSptUnit_a);
+				m_voiSeqId[vi][C_setLfoSptUnit] = m_mstSeqId[C_setLfoSptUnit];
 			}
 			if (m_voiSeqId[vi][C_setMixingVolume] != m_mstSeqId[C_setMixingVolume]) {
 				vo.setMixingVolume(m_setMixingVolume_a);
@@ -134,6 +135,10 @@
 			if (m_voiSeqId[vi][C_setPhaseRMode] != m_mstSeqId[C_setPhaseRMode]) {
 				vo.setPhaseRMode(m_setPhaseRMode_a, m_setPhaseRMode_b);
 				m_voiSeqId[vi][C_setPhaseRMode] = m_mstSeqId[C_setPhaseRMode];
+			}
+			if (m_voiSeqId[vi][C_setOptionClock] != m_mstSeqId[C_setOptionClock]) {
+				vo.setOptionClock(m_setOptionClock_a, m_setOptionClock_b, m_setOptionClock_c);
+				m_voiSeqId[vi][C_setOptionClock] = m_mstSeqId[C_setOptionClock];
 			}
 			if (m_voiSeqId[vi][C_setEnvelope] != m_mstSeqId[C_setEnvelope]) {
 				vo.setEnvelope(m_setEnvelope_a, m_setEnvelope_b, m_setEnvelope_c, m_setEnvelope_d, m_setEnvelope_e);
@@ -214,18 +219,18 @@
 			m_setDetune_b = rate;
 		}
 
-		protected var m_setEnvTimeUnit_a:Number;
-		public function setEnvTimeUnit(spt:Number):void {
+		protected var m_setEnvSptUnit_a:Number;
+		public function setEnvSptUnit(spt:Number):void {
 			m_nowSeqId++;
-			m_mstSeqId[C_setEnvTimeUnit] = m_nowSeqId;
-			m_setEnvTimeUnit_a = spt;
+			m_mstSeqId[C_setEnvSptUnit] = m_nowSeqId;
+			m_setEnvSptUnit_a = spt;
 		}
 
-		protected var m_setLfoResolution_a:Number;
-		public function setLfoResolution(spt:Number):void {
+		protected var m_setLfoSptUnit_a:Number;
+		public function setLfoSptUnit(spt:Number):void {
 			m_nowSeqId++;
-			m_mstSeqId[C_setLfoResolution] = m_nowSeqId;
-			m_setLfoResolution_a = spt;
+			m_mstSeqId[C_setLfoSptUnit] = m_nowSeqId;
+			m_setLfoSptUnit_a = spt;
 		}
 
 		protected var m_setMixingVolume_a:Number;
@@ -290,6 +295,17 @@
 			m_mstSeqId[C_setPhaseRMode] = m_nowSeqId;
 			m_setPhaseRMode_a = mode;
 			m_setPhaseRMode_b = phase;
+		}
+
+		protected var m_setOptionClock_a:int;
+		protected var m_setOptionClock_b:int;
+		protected var m_setOptionClock_c:Number;
+		public function setOptionClock(func:int, mode:int, num:Number):void {
+			m_nowSeqId++;
+			m_mstSeqId[C_setOptionClock] = m_nowSeqId;
+			m_setOptionClock_a = func;
+			m_setOptionClock_b = mode;
+			m_setOptionClock_c = num;
 		}
 
 		protected var m_setEnvelope_a:int;
@@ -409,6 +425,10 @@
 			// 全ての m_voices[] に即時反映
 			for (var i:int = 0; i < m_voiceLen; i++) m_voices[i].setDelay(cnt, lv);
 		}
+		public function setDelayRestart():void {
+			// 全ての m_voices[] に即時反映
+			for (var i:int = 0; i < m_voiceLen; i++) m_voices[i].setDelayRestart();
+		}
 
 		public function close():void {
 			// 全ての m_voices[] に即時反映
@@ -445,9 +465,7 @@
 
 		public function getSamples(samples:Vector.<Number>, max:int, start:int, delta:int):void {
 			for (var i:int = 0; i < m_voiceLen; i++) {
-				if (m_voices[i].isPlaying()) {
-					m_voices[i].getSamples(samples, max, start, delta);
-				}
+				m_voices[i].getSamples(samples, max, start, delta);
 			}
 		}
 	}

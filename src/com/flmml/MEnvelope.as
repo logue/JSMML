@@ -9,7 +9,7 @@
 		public static var s_envClockMode:Boolean = false;		//falseのとき、s_envClockは固定時間。trueのとき、s_envClockは1tick（テンポ依存）。
 		public static var s_envClockMgnf:Number = 1.0;
 		public static var s_envClock:Number = 1.0 / 120.0;
-		public static var s_envResolMode:int = (-1);				//-1:s_envResol未使用(最大解像度), 0:s_envResol固定時間, 1:s_envResolは1tick（テンポ依存）
+		public static var s_envResolMode:int = (-1);			//-1:s_envResol未使用(最大解像度), 0:s_envResol固定時間, 1:s_envResolは1tick（テンポ依存）
 		public static var s_envResolMgnf:Number = 1.0;
 		public static var s_envResol:Number = 1.0;
 
@@ -27,18 +27,34 @@
 		private var m_playing:Boolean;
 		private var m_counter:int;
 		private var m_timeInSamples:int;
+		private var m_releaseStartForDampOff:MEnvelopePoint;
+		
+		private var m_envClockMode:Boolean;
+		private var m_envClockMgnf:Number;
+		private var m_envClock:Number;
+		private var m_envResolMode:int;
+		private var m_envResolMgnf:Number;
+		private var m_envResol:Number;
 		private var m_envResolCnt:Number;
 		private var m_envResolVal:Number;
-		private var m_releaseStartForDampOff:MEnvelopePoint;
 
 		public function MEnvelope(id:int, attack:Number, atksus:Number, decay:Number, sustain:Number, release:Number, relsus:Number) {
 			m_releaseStartPoint = new MEnvelopePoint(id);	//リリース先端を事前に作成。終端はあえて事前作成せず、ＭＭＬ側でリリース未記述をはじく。
 			m_playing = false;
 			m_currentVal = 0.0;
-			m_envResolVal = 0.0;
 			m_releasing = true;
 			m_lvRoundM_Req = -1;
 			m_lvRoundMode = 0;
+			//static初期設定の引き継ぎ
+			m_envClockMode = s_envClockMode;
+			m_envClockMgnf = s_envClockMgnf;
+			m_envClock = s_envClock;
+			m_envResolMode = s_envResolMode;
+			m_envResolMgnf = s_envResolMgnf;
+			m_envResol = s_envResol;
+			m_envResolCnt = m_envResol;
+			m_envResolVal = 0.0;
+			//初期エンベロープデータの作成
 			newPoint(id, 0.0, true, 0);
 			addPoint(id, true, attack, atksus, EPM_NORMAL);
 			addPoint(id, true, decay, sustain, EPM_NORMAL);
@@ -73,7 +89,7 @@
 			point.index = m_envelopeLastPoint.index + 1;
 			point.r_mode = r_mode;
 			point.rate = rate;
-			point.time = (r_mode) ? (int((Number(rate) * s_envClock) * 44100.0)) : 0;
+			point.time = (r_mode) ? (int((Number(rate) * m_envClock) * 44100.0)) : 0;
 			point.level = level;
 			switch (p_mode) {
 			case EPM_NORMAL:		//通常エントリ登録
@@ -126,19 +142,19 @@
 			}
 			if (m_currentPoint.next.r_mode == false) {
 				if (m_currentPoint.next.rate != 0.0) {
-					m_currentPoint.next.time = (Math.abs(m_currentPoint.next.level - m_currentVal) / (1.0 / m_currentPoint.next.rate)) * (44100.0 * s_envClock);
+					m_currentPoint.next.time = (Math.abs(m_currentPoint.next.level - m_currentVal) / (1.0 / m_currentPoint.next.rate)) * (44100.0 * m_envClock);
 				}
 				else {
 					m_currentPoint.next.time = 0.0;
 				}
 			}
 			else {
-				m_currentPoint.next.time = m_currentPoint.next.rate * s_envClock * 44100.0;
+				m_currentPoint.next.time = m_currentPoint.next.rate * m_envClock * 44100.0;
 			}
 			m_step = (m_currentPoint.next.level - m_currentVal) / m_currentPoint.next.time;
 			m_timeInSamples = 0;
 			m_counter = 0;
-			m_envResolCnt = s_envResol;		//解像度有効時triggerEnvelope()の直後の初回getNextAmplitudeLinear()で必ずリフレッシュさせるため
+			m_envResolCnt = m_envResol;		//解像度有効時triggerEnvelope()の直後の初回getNextAmplitudeLinear()で必ずリフレッシュさせるため
 		}
 
 		public function releaseEnvelope():void {
@@ -147,14 +163,14 @@
 			m_currentPoint.level = m_currentVal;
 			if (m_currentPoint.next.r_mode == false) {
 				if (m_currentPoint.next.rate != 0.0) {
-					m_currentPoint.next.time = (Math.abs(m_currentPoint.next.level - m_currentVal) / (1.0 / m_currentPoint.next.rate)) * (44100.0 * s_envClock);
+					m_currentPoint.next.time = (Math.abs(m_currentPoint.next.level - m_currentVal) / (1.0 / m_currentPoint.next.rate)) * (44100.0 * m_envClock);
 				}
 				else {
 					m_currentPoint.next.time = 0.0;
 				}
 			}
 			else {
-				m_currentPoint.next.time = m_currentPoint.next.rate * s_envClock * 44100.0;
+				m_currentPoint.next.time = m_currentPoint.next.rate * m_envClock * 44100.0;
 			}
 			m_step = (m_currentPoint.next.level - m_currentVal) / m_currentPoint.next.time;
 			m_counter = 0;
@@ -191,14 +207,14 @@
 					else {
 						if (m_currentPoint.next.r_mode == false) {
 							if (m_currentPoint.next.rate != 0.0) {
-								m_currentPoint.next.time = (Math.abs(m_currentPoint.next.level - m_currentVal) / (1.0 / m_currentPoint.next.rate)) * (44100.0 * s_envClock);
+								m_currentPoint.next.time = (Math.abs(m_currentPoint.next.level - m_currentVal) / (1.0 / m_currentPoint.next.rate)) * (44100.0 * m_envClock);
 							}
 							else {
 								m_currentPoint.next.time = 0.0;
 							}
 						}
 						else {
-							m_currentPoint.next.time = m_currentPoint.next.rate * s_envClock * 44100.0;
+							m_currentPoint.next.time = m_currentPoint.next.rate * m_envClock * 44100.0;
 						}
 						m_step = (m_currentPoint.next.level - m_currentPoint.level) / m_currentPoint.next.time;
 						m_currentVal = m_currentPoint.level;
@@ -220,17 +236,18 @@
 			m_timeInSamples++;
 			//if (m_currentVal > 1.0) trace("m_currentVal over 1.0");
 
-			if (s_envResolMode < 0) {
-				return m_currentVal;
+			if (m_envResolMode < 0) {
+				m_envResolVal = m_currentVal;		//毎回更新
 			}
 			else {
 				m_envResolCnt += 1.0;
-				if (m_envResolCnt > s_envResol) {
-					m_envResolCnt -= s_envResol;
-					m_envResolVal = m_currentVal;
+				if (m_envResolCnt > m_envResol) {
+					m_envResolCnt -= m_envResol;
+					m_envResolVal = m_currentVal;	//指定間隔更新
 				}
-				return m_envResolVal;
 			}
+			
+			return m_currentVal;
 		}
 
 		public function ampSamplesLinear(samples:Vector.<Number>, start:int, end:int, ampLevel:Number, mixLevel:Number, volLevel:Number, vRate:Number, vIndex:Number, vMax:Number):void {
@@ -258,7 +275,8 @@
 				//ガクガク整数モード（少数以下切り上げ）
 				for(i = start; i < end; i++){
 					if (!m_playing) { samples[i] = 0.0; continue; }		//非演奏中は無音で満たす
-					ex = getNextAmplitudeLinear();
+					getNextAmplitudeLinear();
+					ex = m_envResolVal;
 					
 					v = Math.ceil(ex * vIndex);
 					amplitude = v / vIndex;
@@ -272,7 +290,8 @@
 				//ガクガク整数モード（TYPE-S）
 				for(i = start; i < end; i++){
 					if (!m_playing) { samples[i] = 0.0; continue; }		//非演奏中は無音で満たす
-					ex = getNextAmplitudeLinear();
+					getNextAmplitudeLinear();
+					ex = m_envResolVal;
 					
 					v = Math.floor(ex * (vIndex + 1.0));
 					if (v > vIndex) v = vIndex;
@@ -287,7 +306,8 @@
 				//ガクガク整数モード（TYPE-Y）
 				for(i = start; i < end; i++){
 					if (!m_playing) { samples[i] = 0.0; continue; }		//非演奏中は無音で満たす
-					ex = getNextAmplitudeLinear();
+					getNextAmplitudeLinear();
+					ex = m_envResolVal;
 					
 					v = Math.floor(ex * vIndex);
 					amplitude = v / vIndex;
@@ -301,7 +321,8 @@
 				//ガクガク整数モード（TYPE-D4）
 				for(i = start; i < end; i++){
 					if (!m_playing) { samples[i] = 0.0; continue; }		//非演奏中は無音で満たす
-					ex = getNextAmplitudeLinear();
+					getNextAmplitudeLinear();
+					ex = m_envResolVal;
 					if (!m_releasing) {
 						v = Math.floor(ex * vIndex);
 						amplitude = v / vIndex;
@@ -349,7 +370,8 @@
 				//ガクガク整数モード（少数以下切り上げ）
 				for(i = start; i < end; i++){
 					if (!m_playing) { samples[i] = 0.0; continue; }		//非演奏中は無音で満たす
-					ex = getNextAmplitudeLinear();
+					getNextAmplitudeLinear();
+					ex = m_envResolVal;
 					
 					v = Math.ceil(ex * vIndex);
 					if (v > 0.0) { amplitude = Math.pow( 10.0, (((v - vIndex) * vRate) / 20.0) ); }
@@ -363,7 +385,8 @@
 				//ガクガク整数モード（TYPE-S）
 				for(i = start; i < end; i++){
 					if (!m_playing) { samples[i] = 0.0; continue; }		//非演奏中は無音で満たす
-					ex = getNextAmplitudeLinear();
+					getNextAmplitudeLinear();
+					ex = m_envResolVal;
 					
 					v = Math.floor(ex * (vIndex + 1.0));
 					if (v > vIndex) v = vIndex;
@@ -378,7 +401,8 @@
 				//ガクガク整数モード（TYPE-Y）
 				for(i = start; i < end; i++){
 					if (!m_playing) { samples[i] = 0.0; continue; }		//非演奏中は無音で満たす
-					ex = getNextAmplitudeLinear();
+					getNextAmplitudeLinear();
+					ex = m_envResolVal;
 					
 					v = Math.floor(ex * vIndex);
 					if (v > 0.0) { amplitude = Math.pow( 10.0, (((v - vIndex) * vRate) / 20.0) ); }
@@ -392,7 +416,8 @@
 				//ガクガク整数モード（TYPE-D4）
 				for(i = start; i < end; i++){
 					if (!m_playing) { samples[i] = 0.0; continue; }		//非演奏中は無音で満たす
-					ex = getNextAmplitudeLinear();
+					getNextAmplitudeLinear();
+					ex = m_envResolVal;
 					if (!m_releasing) {
 						v = Math.floor(ex * vIndex);
 						if (v > 0.0) { amplitude = Math.pow( 10.0, (((v - vIndex) * vRate) / 20.0) ); }
@@ -412,6 +437,44 @@
 					}
 				}
 				break;
+			}
+		}
+
+		public function followSPT(spt:Number):void {
+			var envclk:Number;
+			if (m_envClockMode == true) {
+				envclk = ((spt * m_envClockMgnf) / 44100.0);
+				if (envclk < (44.1 / 44100.0)) envclk = 44.1 / 44100.0;		//超高速モードにつきあう限界
+				m_envClock = envclk;										//エンベロープ時間単位の追従
+			}
+			if (m_envResolMode == 1) {
+				envclk = (spt * m_envResolMgnf);
+				if (envclk < 44.1) envclk = 44.1;							//tick依存モードの解像度は1msを下限とする
+				m_envResol = envclk;
+			}
+		}
+
+		public function setEnvClockParam(mode:int, num:Number):void {
+			m_envClockMode = ((mode == 0) ? false : true       );
+			m_envClockMgnf = ((mode == 0) ? (1.0) : num        );
+			m_envClock =     ((mode == 0) ? num   : (1.0/120.0));
+		}
+
+		public function setEnvResolParam(mode:int, num:Number):void {
+			if (mode == 0) {		//固定時間
+				m_envResolMode = 0;
+				m_envResolMgnf = 1.0;
+				m_envResol = 44100.0 * num;
+			}
+			else if (mode == 1) {	//tickカウント依存
+				m_envResolMode = 1;
+				m_envResolMgnf = num;
+				m_envResol = 44100.0 * num;		//暫定数値
+			}
+			else {				//解像度無効（最大解像度）
+				m_envResolMode = (-1);
+				m_envResolMgnf = 1.0;
+				m_envResol = 1.0;
 			}
 		}
 

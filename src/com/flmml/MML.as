@@ -2,9 +2,12 @@
 	import flash.events.EventDispatcher;
 	import flash.utils.*;
 	
+	import flashx.textLayout.elements.BreakElement;
+	
 	import mx.utils.StringUtil;
 
 	public class MML extends EventDispatcher {
+		public static const DEF_BPM:Number = 120.0;
 		public static const DEF_FORM:int = 3;
 		public static const DEF_SUBFORM:int = 0;
 		public static const DEF_DETUNE_RESO:Number = 100.0;
@@ -28,6 +31,8 @@
 		public static const DEF_MIN_DELAY_CT:int = 4;
 		public static const DEF_MAX_DELAY_LV:Number = (-0.2);
 		public static const DEF_MIN_DELAY_LV:Number = (-96.0);
+		public static const DEF_PAN:Number = 0.0;
+		public static const DEF_LG_PAN:int = 0;
 		
 		public static var s_tickUnit:Number = 192.0;
 		public static var s_reportTotalTicks:Boolean;
@@ -71,6 +76,8 @@
 		protected var m_AEnvLvRdMode:int;		// 音量ENVレベルの丸めモード。0 は滑らかモード。
 		protected var m_AEnvLvDenom:Number;		// 音量ENVレベルの分母指定。0.0 は特例で分母にm_VXscaleMaxを採用するモード。
 		protected var m_AEnvLvOffset:Number; 	// 音量ENVレベルへのオフセット。
+		protected var m_pan:Number;				// panpot (for debug disp)
+		protected var m_lgPan:int;				// legacy panpot (for debug disp)
 		protected var m_noiseModDest:int;
 		protected var m_delayCountMax:int;		// ディレイエフェクトの最大サンプル数。０でディレイ無効。
 		protected var m_warning:String;
@@ -99,15 +106,6 @@
 			m_sequencer.addEventListener(MMLEvent.BUFFERING, function(e:MMLEvent):void {
 					self.dispatchEvent(new MMLEvent(MMLEvent.BUFFERING, false, false, 0, 0, e.progress));
 				});
-		}
-
-		public function set onSignal(func:Function):void {
-			// ex) function func(globalTick:uint, event:int):void {}
-			m_sequencer.onSignal = func;
-		}
-
-		public function setSignalInterval(interval:int):void {
-			m_sequencer.setSignalInterval(interval);
 		}
 
 		public function getWarnings():String {
@@ -417,6 +415,38 @@
 							}
 						}
 					}
+					else if (getChar() == 'c') {
+						// @oec: Option Envelope Clock (optClk-Func:0)
+						next();
+						o = 0;	//func num
+						optionClockParamProcess(o);
+					}
+					else if (getChar() == 'r') {
+						// @oer: Option Envelope Resolution for Amplitude (optClk-Func:1)
+						next();
+						o = 1;	//func num
+						optionClockParamProcess(o);
+					}
+					else {
+						// 未定義コマンド
+						warning("[Track:" + m_trackNo + "] ", MWarning.UNKNOWN_COMMAND, "@"+c+c0+c1);
+						next();
+					}
+				}
+				else if (getChar() == 'l') {
+					next();
+					if (getChar() == 'c') {
+						// @olc: Option LFO Clock (optClk-Func:2)
+						next();
+						o = 2;	//func num
+						optionClockParamProcess(o);
+					}
+					else if (getChar() == 'r') {
+						// @olr: Option LFO Resolution (optClk-Func:3)
+						next();
+						o = 3;	//func num
+						optionClockParamProcess(o);
+					}
 					else {
 						// 未定義コマンド
 						warning("[Track:" + m_trackNo + "] ", MWarning.UNKNOWN_COMMAND, "@"+c+c0+c1);
@@ -590,8 +620,8 @@
 				if ( (chkCharIsNum(c0) == true) || (c0 == '-') || (c0 == '+') ) {
 					// @p: PanPot
 					n = getSNumber(0.0);
-					if (n < -100.0) n = -100.0;
-					if (o > 100.0)  n = 100.0;
+					n = limitNum(-100.0, 100.0, n);
+					m_pan = n;						// for debug disp.
 					m_tracks[m_trackNo].recPan(n);
 				}
 				else if (c0 == 'l') {
@@ -1032,6 +1062,67 @@
 			}
 		}
 
+		private function optionClockParamProcess(funcNo:int):void {
+			var c0:String = getChar();
+			var w:String;
+			var nD:Number = 1.0;
+			var nN:Number = 1.0;
+			var ocFunc:int = funcNo;
+			var ocMode:int;
+			var ocNum:Number;
+			
+			if (c0 == '=') {
+				next();
+				if (ocFunc == 1) {
+					ocMode = -1;
+					ocNum = 1.0;
+					m_tracks[m_trackNo].recOptionClock(ocFunc, ocMode, ocNum);
+				}
+				else {
+					optionClockSetWarning(ocFunc);
+				}
+			}
+			else if (c0 == '%') {
+				next();
+				ocMode = 1;
+				if (getChar() == ',') {
+					next();
+					nD = getUNumber(1.0);
+					if (getChar() == ',') {
+						next();
+						nN = getUNumber(1.0);
+					}
+				}
+				ocNum = nN / nD;
+				m_tracks[m_trackNo].recOptionClock(ocFunc, ocMode, ocNum);
+			}
+			else if (chkCharIsNum(c0) == true) {
+				ocMode = 0;
+				nD = getUNumber(1.0);
+				if (getChar() == ',') {
+					next();
+					nN = getUNumber(1.0);
+				}
+				ocNum = nN / nD;
+				m_tracks[m_trackNo].recOptionClock(ocFunc, ocMode, ocNum);
+			}
+			else {
+				//no param
+				optionClockSetWarning(ocFunc);
+			}
+		}
+		private function optionClockSetWarning(funcNo:int):void {
+			var w:String;
+			switch (funcNo) {
+				case 0: w = "@oec"; break;
+				case 1: w = "@oer"; break;
+				case 2: w = "@olc"; break;
+				case 3: w = "@olr"; break;
+				default: break;
+			}
+			m_warning += "[Track:" + m_trackNo + "] " + w + " の指定に問題があるため無視します。\n";
+		}
+
 		protected function firstLetter():void {
 			var c:String = getCharNext();
 			var c0:String;
@@ -1094,6 +1185,7 @@
 				i = getUInt(0);			//コメント認識番号
 				m_warning += "!Report (ID:" + i + ") "
 								+ "Track=" + m_trackNo
+								+ ",Now%=" + m_totalTicks
 								+ ",o=" + m_octave
 								+ ",ns=" + m_noteShift
 								+ ",@d=" + m_detune + "/" + m_detuneReso
@@ -1107,6 +1199,8 @@
 								+ ",vp=" + m_volumeCalcPriority
 								+ ",vr=" + m_volumeRoundMode
 								+ ",NowV=" + m_volumeCurrent
+								+ ",@p=" + m_pan
+								+ ",p=" + m_lgPan
 								+ "\n";
 				break;
 			case 'v': // v..
@@ -1248,6 +1342,7 @@
 				i = getSInt(0);
 				if (i < -1) i = (-1);
 				if (i > 1)  i = 1;
+				m_lgPan = i;							// for debug disp.
 				m_tracks[m_trackNo].recPanLegacy(i);
 				break;
 			case 'l': // Length
@@ -1302,7 +1397,7 @@
 				break;
 			case 't': // Tempo
 				var tempoGT:uint;
-				m_tempo = getUNumber(MTrack.DEFAULT_BPM);			//省略時はデフォルト値
+				m_tempo = getUNumber(DEF_BPM);						//省略時はデフォルト値
 				if (getChar() == ',') {
 					next();
 					n = getUNumber(1.0);							//省略時は分母＝１
@@ -1470,6 +1565,17 @@
 			m_letter += 1;
 		}
 
+		private function limitNum(min:Number, max:Number, num:Number):Number {
+			if (num < min) return min;
+			else if (num > max) return max;
+			else return num;
+		}
+		private function limitNumI(min:int, max:int, num:int):int {
+			if (num < min) return min;
+			else if (num > max) return max;
+			else return num;
+		}
+
 		protected function chkCharIsNum(c:String):Boolean {
 			if (c >= '0' && c <= '9') {
 				return true;
@@ -1582,7 +1688,7 @@
 		}
 
 		private function initMMLvariable():void {
-			m_tempo = MTrack.DEFAULT_BPM;
+			m_tempo = DEF_BPM;
 			m_totalTicks = 0;
 			m_totalOvFlow = false;
 			m_keyoff = 1;
@@ -1617,6 +1723,9 @@
 			m_volumeMagDenom = DEF_VOLMAGDNM;
 			m_volumeCalcPriority = DEF_VOLCULCPR;
 			m_volumeRoundMode = DEF_VOLROUNDM;
+			
+			m_pan = DEF_PAN;
+			m_lgPan = DEF_LG_PAN;
 			
 			m_AEnvLvRdMode = 0;
 			m_AEnvLvDenom = 0.0;
@@ -1876,7 +1985,6 @@
 						m_warning += "#TICKUNITの設定が規定（48以上、3072以下の４で割り切れる数）外のため、既定192から変更しません。(" + s + ")\n";
 					}
 				}
-				setSignalInterval((int(s_tickUnit)) / 4);
 			}
 
 			// MULOVSWM :Multiple of oversampling of WAVEMEM
@@ -2032,7 +2140,7 @@
 						}
 						break;
 					case 0:
-						i = (-1);		//error status
+						i = (-9);		//error status
 						break;
 					}
 					if ( i != (-9) ) {
@@ -2178,7 +2286,7 @@
 					if ( (i >= 0) && (isNaN(n) == false) ) { 
 						MChannel.s_lfoDeltaMode = ((i == 0) ? false           : true       );
 						MChannel.s_lfoDeltaMgnf = ((i == 0) ? (1.0)           : n          );
-						MChannel.s_lfoDelta =     ((i == 0) ? int(44100.0 * n): (1.0/120.0));
+						MChannel.s_lfoDelta =     ((i == 0) ? int(44100.0 * n): (147)      );
 					}
 					else {
 						m_warning += "#LFORESOLの設定が規定外のため、既定から変更しません。(" + s + ")\n";
@@ -2831,7 +2939,8 @@
 			return str.substring(0, start) + str.substring(end+1);
 		}
 
-		public function play(str:String):Boolean {
+		public function play(str:String, start:uint=0):Boolean {
+			var i:int;
 			if (m_sequencer == null) {
 				return false;
 			}
@@ -2844,7 +2953,7 @@
 			m_tracks = new Vector.<MTrack>();
 
 			//全トラックに適用される変数のみ初期化。トラックごとの初期化はcreateTrack()に移動。
-			m_tempo  = MTrack.DEFAULT_BPM;
+			m_tempo  = DEF_BPM;
 
 			m_form = MOscillator.PULSE;		//MOscillator.asで初期化されるのでここは形式的。
 
@@ -2878,8 +2987,7 @@
 			MTrack.s_IRRequestLastTrack = 0;		//無限リピート要求用のスタティック変数を念のため初期化
 			process();
 
-
-			// omit
+			// 最終トラックがイベント無しなら破棄
 			if (m_tracks[m_tracks.length-1].getNumEvents() == 0) m_tracks.pop();
 
 			//各トラックの累積デルタを締め切る。（タイで終了する場合など、最終累積デルタが確定していない場合を想定）
@@ -2892,8 +3000,27 @@
 			// 無限リピートに問題がないかチェック
 			checkIRepeatERR();
 
-			// conduct ：テンポトラックに書き込まれたテンポを同時刻の各トラックに配信。
-			m_tracks[MTrack.TEMPO_TRACK].conduct(m_tracks);
+			// conduct：テンポトラックに書き込まれたテンポを同時刻の各トラックに配信。
+			if (start == 0) {
+				//通常処理
+				m_tracks[MTrack.TEMPO_TRACK].conduct(m_tracks);
+			}
+			else {
+				//指定ticks数の先頭スキップ再生
+				var minGlobalTicks:uint = uint.MAX_VALUE;
+				for (i = MTrack.FIRST_TRACK; i < m_tracks.length; i++) {
+					if (minGlobalTicks > m_tracks[i].getRecGlobalTick()) {
+						minGlobalTicks = m_tracks[i].getRecGlobalTick();
+					}
+				}
+				if (start < minGlobalTicks) {
+					m_tracks[MTrack.TEMPO_TRACK].conduct_skip(m_tracks, start);
+				}
+				else {
+					m_warning += "再生開始ticks数 " + start + " は、現状の曲では " + minGlobalTicks + " 未満にしてください。通常再生します。\n";
+					m_tracks[MTrack.TEMPO_TRACK].conduct(m_tracks);
+				}
+			}
 
 			// report要求に応じた表示
 			if (s_reportTotalTicks == true) {
@@ -2913,18 +3040,18 @@
 			processIRepeat();
 
 			// post process
-			for(var i:int = MTrack.TEMPO_TRACK; i < m_tracks.length; i++) {
+			for(i = MTrack.TEMPO_TRACK; i < m_tracks.length; i++) {
 				if (i > MTrack.TEMPO_TRACK) {
 					if (m_usingPoly && (m_polyForce || m_tracks[i].findPoly())) {
 						m_tracks[i].usingPoly(m_polyVoice);
 					}
 				}
-				m_tracks[i].recRestMSec(4000);
+				m_tracks[i].recRest( int(s_tickUnit * 3.0) );
 				m_tracks[i].recClose();
 				m_tracks[i].recEOT();
 				m_sequencer.connect(m_tracks[i]);
 			}
-			m_tracks[MTrack.TEMPO_TRACK].addTotalMSec(4000);		//上記recRestMSec()と同じだけ指定すること
+			m_tracks[MTrack.TEMPO_TRACK].addTotalMSec( int(s_tickUnit * 3.0) );		//上記recRest()と同じだけ指定すること
 
 			// dispatch event
 			dispatchEvent(new MMLEvent(MMLEvent.COMPILE_COMPLETE, false, false, 0, 0));
@@ -2951,25 +3078,27 @@
 			m_sequencer.setMasterVolume(vol);
 		}
 
-		public function getGlobalTick():uint {
-			return m_sequencer.getGlobalTick();
-		}
-
 		public function isPlaying():Boolean {
 			return m_sequencer.isPlaying();
+		}
+		public function isWorking():Boolean {
+			return m_sequencer.isWorking();
 		}
 
 		public function isPaused():Boolean {
 			return m_sequencer.isPaused();
 		}
 
-		public function getTotalMSec():uint {
+		public function getTotalMSec():Number {
 			return m_tracks[MTrack.TEMPO_TRACK].getTotalMSec();
 		}
 		public function getTotalTimeStr():String {
 			return m_tracks[MTrack.TEMPO_TRACK].getTotalTimeStr();
 		}
-		public function getNowMSec():uint {
+		public function getSndChannelPos():Number {
+			return m_sequencer.getSndChannelPos();
+		}
+		public function getNowMSec():Number {
 			return m_sequencer.getNowMSec();
 		}
 		public function getNowTimeStr():String {
@@ -2978,11 +3107,59 @@
 		public function getVoiceCount():int {
 			var i:int;
 			var c:int = 0;
+			
+			if (m_sequencer.isWorking() == false) return 0;
+			
 			for (i = 0; i < m_tracks.length; i++) {
 				c += m_tracks[i].getVoiceCount();
 			}
 			return c;
-		}		
+		}
+		public function getTotalVoiceAlloc():int {
+			var i:int;
+			var c:int = 0;
+			
+			if (m_sequencer.isWorking() == false) return 0;
+			
+			for (i = MTrack.FIRST_TRACK; i < m_tracks.length; i++) {
+				c += m_tracks[i].getVoiceAllocNum();
+			}
+			return c;
+		}
+		public function getTotalTrackNum():int {
+			if (m_sequencer.isWorking() == false) {
+				return 0;
+			}
+			else {
+				return int(m_tracks.length);
+			}
+		}
+		private var m_seqtrk_msec_ofs:Number;
+		private var m_seqtrk_msec_old:Number;
+		public function sequenceTrackInfo_init(ofs:Number):void {
+			m_seqtrk_msec_ofs = ofs;
+			m_seqtrk_msec_old = m_seqtrk_msec_ofs;
+		}
+		public function sequenceTrackInfo(msec:Number):void {
+			var i:int;
+			var seqstep:int;
+			if (msec <= m_seqtrk_msec_ofs) return;
+			if (msec <= m_seqtrk_msec_old) return;
+			seqstep = int(((msec - m_seqtrk_msec_old) * 44100.0) / 1000.0);
+			if (seqstep == 0) return;
+			
+			for (i = MTrack.FIRST_TRACK; i < m_tracks.length; i++) {
+				m_tracks[i].forStatus_onSampleData(0,seqstep);
+			}
+			
+			m_seqtrk_msec_old += ((Number(seqstep) * 1000.0) / 44100.0);
+		}
+		public function getTrackInfo(track:int):Vector.<Number> {
+			return m_tracks[track].m_tStatus_info;
+		}
+		public function getTrackPolyNoteOn(track:int):Vector.<Number> {
+			return m_tracks[track].m_tStatus_noteOn;
+		}
 		public function getMetaTitle():String {
 			return m_metaTitle;
 		}

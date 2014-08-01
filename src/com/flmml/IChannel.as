@@ -9,8 +9,8 @@
 		function noteOff(noteNo:int):void;
 		function setNoteNo(noteNo:int, tie:Boolean = true):void;
 		function setDetune(detune:Number, rate:int):void;
-		function setEnvTimeUnit(spt:Number):void;
-		function setLfoResolution(spt:Number):void;
+		function setEnvSptUnit(spt:Number):void;
+		function setLfoSptUnit(spt:Number):void;
 		function setMixingVolume(m_vol:Number):void;
 		function setVolMode(max:int, rate:Number, mode:int):void;
 		function setVolume(vol:Number):void;
@@ -19,6 +19,7 @@
 		function setForm(form:int, sub:int):void;
 		function setSubForm(subform:int):void;
 		function setPhaseRMode(mode:int, phase:Number):void;
+		function setOptionClock(func:int, mode:int, num:Number):void;
 		function setEnvelope(dest:int, lvRd_mode:int, atk_mode:Boolean, initlevel:Number, evPoints:Array):void;
 		function setLFO(target:int, paramA:Array, spt:Number):void;
 		function setLFOrestart(target:int):void;
@@ -36,6 +37,7 @@
 		function setFade(time:Number, range:Number, mode:int):void;
 		function allocDelayBuffer(reqbuf:int):void;
 		function setDelay(cnt:int, lv:Number):void;
+		function setDelayRestart():void;
 		function close():void;
 		function setSoundOff():void;
 		function reset():void;

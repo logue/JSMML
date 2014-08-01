@@ -54,6 +54,13 @@
 			m_counter = 1.0;
 			m_val = 0.0;
 		}
+		public override function addPShift(sample:int):void {
+			var i:int;
+			if (sample <= 0) return;
+			for (i=0; i<sample; i++) {
+				getNextSample();
+			}
+		}
 		public override function setWaveNo(waveNo:int):void {
 			var n:int = waveNo;
 			if (n >= MAX_WAVE) n = MAX_WAVE-1;

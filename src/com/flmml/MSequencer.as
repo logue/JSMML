@@ -12,7 +12,6 @@
 	import flash.utils.*;
 
 	public class MSequencer extends EventDispatcher {
-		public var onSignal:Function = null;
 		public static const BUFFER_SIZE:int         = 8192;
 		public static const RATE44100:int           = 44100;
 
@@ -36,17 +35,13 @@
 		protected var m_processTrack:int;
 		protected var m_processOffset:int;
 		protected var m_output:Boolean; //! 現在バッファ書き込み中かどうか
-		protected var m_trackArr:Array;
-		protected var m_signalArr:Array;
-		protected var m_signalPtr:int;
-		protected var m_globalTick:uint;
+		protected var m_tracks:Vector.<MTrack>;
 		protected var m_status:int;
-		protected var m_signalInterval:int;
 		protected var m_stopTimer:Timer; //! 停止処理キック用のタイマー
 		protected var m_buffTimer:Timer; //! 一時停止＆バッファリング処理キック用のタイマー
 		protected var m_procTimer:Timer; //! バッファ書き込み処理キック用のタイマー
 		protected var m_multiple:int;
-		protected var m_startTime:uint;
+		protected var m_startTime:Number;
 		protected var m_pausedPos:Number;
 		protected var m_restTimer:Timer;
 		protected var m_debugDate:Date;
@@ -58,13 +53,7 @@
 			MChannel.boot(MSequencer.BUFFER_SIZE * m_multiple);
 			MOscillator.boot();
 			MEnvelope.boot();
-			m_trackArr = new Array();
-			m_signalArr = new Array(3);
-			for(var i:int = 0; i < m_signalArr.length; i++) {
-				m_signalArr[i] = new MSignal(i);
-				m_signalArr[i].setFunction(onSignalHandler);
-			}
-			m_signalPtr = 0;
+			m_tracks = new Vector.<MTrack>;
 			m_buffer = new Vector.<Vector.<Number>>(2);
 			m_buffer.fixed = true;
 			m_buffer[0] = new Vector.<Number>(MSequencer.BUFFER_SIZE * m_multiple * 2); // * 2 stereo
@@ -77,9 +66,8 @@
 			m_sound = new Sound();
 			m_soundChannel = new SoundChannel();
 			m_soundTransform = new SoundTransform();
-			m_pausedPos = 0;
+			m_pausedPos = 0.0;
 			setMasterVolume(100);
-			setSignalInterval((int(MML.s_tickUnit)) / 4 );
 			stop();
 			m_sound.addEventListener(SampleDataEvent.SAMPLE_DATA, onSampleData);
 			m_restTimer = null;
@@ -88,10 +76,9 @@
 		public function play():void {
 			if (m_status != STATUS_PAUSE) {
 				stop();
-				m_globalTick = 0;
 				m_process1stTime = true;
-				for (var i:int = 0; i < m_trackArr.length; i++) {
-					m_trackArr[i].seekTop();
+				for (var i:int = 0; i < m_tracks.length; i++) {
+					m_tracks[i].seekTop();
 				}
 				m_status = STATUS_BUFFERING;
 				processStart();
@@ -99,27 +86,30 @@
 			else {
 				m_status = STATUS_PLAY;
 				m_soundChannel = m_sound.play(m_pausedPos);
-				m_startTime = getTimer();
-				var totl:uint = getTotalMSec();
-				var rest:uint = (totl > m_pausedPos) ? (totl - m_pausedPos) : 0;
-				m_restTimer = new Timer(rest, 1);
-				m_restTimer.addEventListener(TimerEvent.TIMER, onStopReq);
-				m_restTimer.start();
+				m_startTime = Number(getTimer());
+				var totl:Number = getTotalMSec();
+				var rest:Number = (totl > m_pausedPos) ? (totl - m_pausedPos) : 0.0;
+				var rpti:Boolean = MTrack.s_infiniteRepeatF;
+				if (rpti == false) {
+					m_restTimer = new Timer(rest, 1);
+					m_restTimer.addEventListener(TimerEvent.TIMER, onStopReq);
+					m_restTimer.start();
+				}
 			}
-			m_debugDate = new Date();
+			//m_debugDate = new Date();
 		}
 
 		public function stop():void {
-			m_stopTimer = new Timer(20, 1);
+			m_stopTimer = new Timer(20.0, 1);
 			m_stopTimer.addEventListener(TimerEvent.TIMER, onStopReq);
-			m_buffTimer = new Timer(20, 1);
+			m_buffTimer = new Timer(20.0, 1);
 			m_buffTimer.addEventListener(TimerEvent.TIMER, onBufferingReq);
-			m_procTimer = new Timer(24, 1);
+			m_procTimer = new Timer(20.0, 1);
 			m_procTimer.addEventListener(TimerEvent.TIMER_COMPLETE, processAll);
 			if (m_restTimer) m_restTimer.stop();
 			if (m_soundChannel) m_soundChannel.stop();
 			m_status = STATUS_STOP;
-			m_pausedPos = 0;
+			m_pausedPos = 0.0;
 		}
 
 		public function pause():void {
@@ -145,6 +135,9 @@
 		}
 
 		public function isPlaying():Boolean {
+			return (m_status > STATUS_BUFFERING);
+		}
+		public function isWorking():Boolean {
 			return (m_status > STATUS_PAUSE);
 		}
 
@@ -153,27 +146,14 @@
 		}
 
 		public function disconnectAll():void {
-			while(m_trackArr.pop()) { }
+			while(m_tracks.pop()) { }
 			m_status = STATUS_STOP;
 		}
 
 		public function connect(track:MTrack):void {
-			track.m_signalInterval = m_signalInterval;
-			m_trackArr.push(track);
+			m_tracks.push(track);
 		}
 
-		public function getGlobalTick():uint {
-			return m_globalTick;
-		}
-
-		public function setSignalInterval(interval:int):void {
-			m_signalInterval = interval;
-		}
-
-		protected function onSignalHandler(globalTick:uint, event:int):void {
-			m_globalTick = globalTick;
-			if (onSignal != null) onSignal(globalTick, event);
-		}
 /*
 		private function reqStop():void {
 			m_stopTimer.start();
@@ -204,7 +184,7 @@
 			var sLen:int = MSequencer.BUFFER_SIZE * m_multiple;
 			var bLen:int = MSequencer.BUFFER_SIZE * 4;
 			if (bLen > sLen) bLen = sLen;
-			var nLen:int = m_trackArr.length;
+			var nLen:int = m_tracks.length;
 			var i:int;
 			var buffer:Vector.<Number> = m_buffer[1 - m_playSide];
 			var now:Date;
@@ -220,10 +200,6 @@
 				}
 				for(i = sLen * 2 - 1; i >= 0; i--) {
 					buffer[i] = 0.0;
-				}
-				if (nLen > 0) {
-					var track:MTrack = m_trackArr[MTrack.TEMPO_TRACK];
-					track.onSampleData(buffer, 0, sLen, m_signalArr[m_signalPtr]);
 				}
 				m_processTrack = MTrack.FIRST_TRACK;
 				m_processOffset = 0;
@@ -242,7 +218,7 @@
 						m_step = STEP_POST;
 						break;
 					} else {
-						m_trackArr[m_processTrack].onSampleData(buffer, m_processOffset, m_processOffset + bLen);
+						m_tracks[m_processTrack].onSampleData(buffer, m_processOffset, m_processOffset + bLen);
 						m_processOffset += bLen;
 						if (m_processOffset >= sLen) {
 							m_processTrack++;
@@ -267,9 +243,9 @@
 					processStart();
 					m_soundChannel = m_sound.play();
 					//trace("play");
-					m_startTime = getTimer();
-					var totl:uint = getTotalMSec();
-					var rest:uint = (totl > m_pausedPos) ? (totl - m_pausedPos) : 0;
+					m_startTime = Number(getTimer());
+					var totl:Number = getTotalMSec();
+					var rest:Number = (totl > m_pausedPos) ? (totl - m_pausedPos) : 0.0;
 					var rpti:Boolean = MTrack.s_infiniteRepeatF;
 					if (rpti == false) {
 						m_restTimer = new Timer(rest, 1);
@@ -309,7 +285,7 @@
 					return;
 				}
 				else if (m_status == STATUS_PLAY) {
-					if (m_trackArr[MTrack.TEMPO_TRACK].isEnd()) {
+					if (m_tracks[MTrack.TEMPO_TRACK].isEnd()) {
 						m_status = STATUS_LAST;
 					}
 				}
@@ -336,28 +312,33 @@
 			m_playSize++;
 			//trace("e.data.writeFloat(buffer[ " + base + " ]) / m_playSize=" + m_playSize + "  m_playSide=" + m_playSide);
 			
-			//m_signalArr[(m_signalPtr + m_signalArr.length-1) % m_signalArr.length].start();
-			m_signalPtr = (++m_signalPtr) % m_signalArr.length;
 			m_output = false;
 		}
-		public function getTotalMSec():uint {
-			return m_trackArr[MTrack.TEMPO_TRACK].getTotalMSec();
+		public function getSndChannelPos():Number {
+			if (m_soundChannel) {
+				return m_soundChannel.position;
+			}
+			else {
+				return 0.0;
+			}
 		}
-		public function getNowMSec():uint {
-			var now:uint = 0;
-			//var tot:uint = getTotalMSec();
+		public function getTotalMSec():Number {
+			return m_tracks[MTrack.TEMPO_TRACK].getTotalMSec();
+		}
+		public function getNowMSec():Number {
+			var now:Number = 0.0;
 			switch (m_status) {
 				case STATUS_PLAY:
 				case STATUS_LAST:
-				now = getTimer() - m_startTime + m_pausedPos;
-				return now;			//無限リピート機能が無かったとき→ return (now < tot) ? now : tot;
+				now = Number(getTimer()) - m_startTime + m_pausedPos;
+				return now;			//無限リピート機能搭載により常に現在時を返す
 				default:
-				return m_pausedPos;
+				return m_pausedPos;	//pause時
 			}
 			return 0;
 		}
 		public function getNowTimeStr():String {
-			var sec:Number = Math.ceil(Number(getNowMSec()) / 1000.0);
+			var sec:Number = Math.ceil(getNowMSec() / 1000.0);
 			if (sec >= 86400.0) return "over24h";
 			var shour:String = "0" + String(int(sec / 3600.0));
 			var smin:String  = "0" + String(int((sec / 60.0) % 60.0));
